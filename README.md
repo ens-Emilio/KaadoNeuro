@@ -1,5 +1,7 @@
 # KaadoNeuro
 
+Português | [English](README.en.md) | [Español](README.es.md)
+
 Aplicativo PWA de flashcards focado em simplicidade, com repetição espaçada SM-2 e funcionamento local-first.
 
 ## 🚀 Visão Geral
@@ -79,14 +81,14 @@ Pré-requisitos: Node.js (v18+) e gerenciador de pacotes (npm, yarn ou pnpm).
 
 ## 📤 Importação de Cartões
 
-Na tela de edição de baralho, clique no botão **"Importar"** para abrir as opções:
+Dentro de um baralho, clique em **Importar** para abrir as opções:
 
 ### 1. Aba Arquivo
 Arraste ou selecione arquivos `.json`, `.md` ou `.txt`.
 
 ### 2. Aba Texto
 Cole seu conteúdo diretamente. Ideal para notas rápidas ou copiar/colar do ChatGPT.
-*Nota: Limite de segurança de 50.000 caracteres por importação.*
+O importador mostra uma prévia antes de salvar.
 
 **Formatos Aceitos:**
 
@@ -109,6 +111,10 @@ Próxima resposta.
 ]
 ```
 
+## Backup
+
+A seção **Backup dos seus dados** no Tutorial permite exportar e importar um arquivo JSON completo. Os dados ficam no navegador atual e não há sincronização entre dispositivos.
+
 ## Configuração de IA
 
 Acesse **IA** na navegação principal ou `/settings/ai` para conectar um provedor próprio e conferir os modelos disponíveis.
@@ -121,7 +127,7 @@ Providers disponíveis:
 - OpenRouter
 - OpenAI-compatible, com URL base própria
 
-A chave é enviada ao endpoint server-side do próprio app e usada somente durante a requisição. A configuração fica no `localStorage` deste dispositivo. O app não envia a chave para terceiros além do provider escolhido.
+A requisição é feita diretamente pelo navegador. A chave fica no armazenamento local deste dispositivo e só é enviada ao provider escolhido. Não informe uma chave em um site cujo operador ou host você não confia.
 
 O fluxo de geração mostra uma prévia editável antes de gravar. Nenhum baralho ou cartão é salvo sem confirmação.
 
@@ -129,8 +135,7 @@ O fluxo de geração mostra uma prévia editável antes de gravar. Nenhum baralh
 
 - até 30 cartões por lote;
 - até 12.000 caracteres de contexto por geração;
-- timeout de 45 segundos no provider;
-- resposta precisa seguir o schema JSON interno.
+- resposta em formato JSON validada antes de aparecer na prévia.
 
 ### Segurança
 
