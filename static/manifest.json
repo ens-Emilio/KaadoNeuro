@@ -1,16 +1,16 @@
 {
-    "name": "KaadoNeuro: SM-2 Flashcards",
-    "short_name": "KaadoNeuro",
-    "description": "App de Flashcards com algoritmo SM-2",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#000000",
-    "icons": [
-        {
-            "src": "favicon.svg",
-            "sizes": "any",
-            "type": "image/svg+xml"
-        }
-    ]
+	"name": "KaadoNeuro: SM-2 Flashcards",
+	"short_name": "KaadoNeuro",
+	"description": "PWA Local-First de repetição espaçada SM-2 — foco, clareza e memória",
+	"start_url": "/",
+	"display": "standalone",
+	"background_color": "#F2EFE9",
+	"theme_color": "#9E4733",
+	"icons": [
+		{
+			"src": "favicon.svg",
+			"sizes": "any",
+			"type": "image/svg+xml"
+		}
+	]
 }

@@ -1,10 +1,61 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { locales, localizeHref } from '$lib/paraglide/runtime';
+	import { Sun, Moon } from '@lucide/svelte';
+	import { getLocale, setLocale, locales } from '$lib/paraglide/runtime.js';
+	import { localeNames, rtlLocales } from '$lib/i18n/locales.js';
+	import * as m from '$lib/paraglide/messages.js';
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import logoMark from '$lib/assets/logo-mark.svg';
 
 	let { children } = $props();
+
+	const navigation = $derived([
+		{ href: '/', label: m['nav.home']() },
+		{ href: '/stats', label: m['nav.stats']() },
+		{ href: '/tutorial', label: m['nav.tutorial']() },
+		{ href: '/settings/ai', label: m['nav.ai']() }
+	]);
+
+	let pathname = $derived(page.url.pathname);
+
+	function isActive(href: string) {
+		return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
+	}
+
+	let theme: 'light' | 'dark' = $state('light');
+	let locale = $state(getLocale());
+
+	$effect(() => {
+		try {
+			const saved = localStorage.getItem('kaadoneuro_theme');
+			if (saved === 'dark' || saved === 'light') theme = saved;
+			else if (window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark';
+			document.documentElement.setAttribute('data-theme', theme);
+		} catch {}
+	});
+
+	$effect(() => {
+		locale = getLocale();
+		document.documentElement.lang = locale;
+		document.documentElement.dir = rtlLocales[locale] ? 'rtl' : 'ltr';
+	});
+
+	function toggleTheme() {
+		theme = theme === 'dark' ? 'light' : 'dark';
+		document.documentElement.setAttribute('data-theme', theme);
+		try { localStorage.setItem('kaadoneuro_theme', theme); } catch {}
+	}
+
+	function changeLocale(e: Event) {
+		const value = (e.target as HTMLSelectElement).value;
+		const next = locales.find((item) => item === value);
+		if (!next) return;
+		setLocale(next);
+		locale = next;
+		document.documentElement.lang = next;
+		document.documentElement.dir = rtlLocales[next] ? 'rtl' : 'ltr';
+	}
 </script>
 
 <svelte:head>
@@ -12,11 +63,57 @@
 	<title>KaadoNeuro</title>
 </svelte:head>
 
-{@render children()}
-<div style="display:none">
-	{#each locales as locale}
-		<a href={localizeHref(page.url.pathname, { locale })}>
-			{locale}
+<header class="sticky top-0 z-30 border-b border-border/70 bg-[color-mix(in_oklch,var(--bg)_92%,transparent)] backdrop-blur-[14px]">
+	<div class="container mx-auto flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 sm:px-6">
+		<a href="/" class="flex items-center gap-2.5 font-display text-[22px] tracking-[-0.02em]" aria-label={m['brand.home']()}>
+			<img src={logoMark} alt="" width="32" height="32" class="size-8 shrink-0" aria-hidden="true" />
+			<span>KaadoNeuro</span>
 		</a>
-	{/each}
-</div>
+		<nav
+			aria-label={m['nav.language']()}
+			class="order-3 flex w-full items-center gap-1 overflow-x-auto border-t border-border/60 pt-2 md:order-none md:ms-4 md:w-auto md:border-0 md:pt-0"
+		>
+			{#each navigation as item}
+				<a
+					href={item.href}
+					aria-current={isActive(item.href) ? 'page' : undefined}
+					class="shrink-0 border-b-2 px-2.5 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.08em] transition-colors {isActive(
+						item.href
+					)
+						? 'border-[var(--accent-text)] text-accent'
+						: 'border-transparent text-muted-foreground hover:border-[var(--border-semantic)] hover:text-foreground'}"
+				>
+					{item.label}
+				</a>
+			{/each}
+		</nav>
+		<div class="ms-auto flex items-center gap-2">
+			<select
+				class="min-h-9 rounded-md border border-border bg-card px-2 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+				aria-label={m['nav.language']()}
+				value={locale}
+				onchange={changeLocale}
+			>
+				{#each locales as l}
+					<option value={l}>{localeNames[l] ?? l}</option>
+				{/each}
+			</select>
+			<button
+				onclick={toggleTheme}
+				class="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold transition-colors hover:border-[var(--border-strong)]"
+				aria-label={theme === 'dark' ? m['theme.toLight']() : m['theme.toDark']()}
+				aria-pressed={theme === 'dark'}
+			>
+				{#if theme === 'dark'}
+					<Moon class="size-3.5" aria-hidden="true" />
+					{m['theme.dark']()}
+				{:else}
+					<Sun class="size-3.5" aria-hidden="true" />
+					{m['theme.light']()}
+				{/if}
+			</button>
+		</div>
+	</div>
+</header>
+
+{@render children()}

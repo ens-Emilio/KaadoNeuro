@@ -1,0 +1,11 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">KaadoNeuro</title>
+  <desc id="desc">Sinete terracota com um K formado por um caminho neural.</desc>
+  <rect x="4" y="4" width="56" height="56" rx="10" fill="#9E4733"/>
+  <rect x="7.25" y="7.25" width="49.5" height="49.5" rx="7.25" stroke="#FBF9F5" stroke-opacity="0.22" stroke-width="0.8"/>
+  <path d="M20.5 16.5V47.5" stroke="#FBF9F5" stroke-width="4.5" stroke-linecap="round"/>
+  <path d="M20.5 32C27 32 31 30.5 35.8 25.6L42.5 18.5" stroke="#FBF9F5" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M20.5 32C27 32 31 33.5 35.8 38.4L42.5 45.5" stroke="#FBF9F5" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="43" cy="18" r="2.6" fill="#FBF9F5"/>
+  <circle cx="43" cy="46" r="2.6" fill="#FBF9F5"/>
+</svg>

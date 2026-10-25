@@ -2,15 +2,14 @@
 	import { page } from '$app/state';
 	import { cards, reviewLogs, generateId } from '$lib/stores.js';
 	import { calculateReview } from '$lib/sm2.js';
-	import type { Flashcard } from '$lib/types.js';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
-	import { goto } from '$app/navigation';
+	import { haptic } from '$lib/haptics.js';
 	import { ArrowLeft } from '@lucide/svelte';
+	import * as m from '$lib/paraglide/messages.js';
 
 	const deckId = page.params.deckId ?? '';
 
-	// Cards due today or earlier
 	let dueCards = $derived(
 		$cards
 			.filter((c) => c.deckId === deckId && new Date(c.dueDate) <= new Date())
@@ -18,153 +17,178 @@
 	);
 
 	let isFlipped = $state(false);
+	let anim: '' | 'shake' | 'sink' | 'rise' = $state('');
+	let showStamp = $state(false);
+	let totalAtStart = $state(0);
+	let sessionCount = $state(0);
 
-	// Since we remove cards from the list as we review them, the current card is always the first one (index 0).
+	$effect(() => {
+		if (dueCards.length > 0 && totalAtStart === 0) {
+			totalAtStart = dueCards.length;
+			sessionCount = 0;
+		}
+		if (dueCards.length === 0 && totalAtStart > 0) {
+			sessionCount = totalAtStart;
+		}
+	});
+
 	let currentCard = $derived(dueCards[0]);
+	let progress = $derived(totalAtStart > 0 ? ((totalAtStart - dueCards.length) / totalAtStart) * 100 : 0);
+	let counterText = $derived(dueCards.length > 0 ? `${totalAtStart - dueCards.length + 1} / ${totalAtStart}` : `0 / ${totalAtStart || 0}`);
 
 	function handleFlip() {
 		isFlipped = true;
+		haptic(10);
 	}
 
 	function processReview(quality: number) {
 		if (!currentCard) return;
+		const id = currentCard.id;
+		if (quality === 0) {
+			anim = 'shake';
+			haptic([10, 30, 10]);
+			setTimeout(() => (anim = ''), 260);
+		} else if (quality === 3) {
+			anim = 'sink';
+			haptic(10);
+			setTimeout(() => (anim = ''), 220);
+		} else if (quality === 4 || quality === 5) {
+			showStamp = true;
+			haptic(quality === 5 ? 18 : 10);
+			setTimeout(() => (showStamp = false), 700);
+			anim = 'rise';
+		}
 
-		// Calculate new schedule
 		const updated = calculateReview(currentCard, quality);
-
-		// Update card in store
-		cards.update((all) => all.map((c) => (c.id === currentCard.id ? { ...c, ...updated } : c)));
-
-		// Log review
+		cards.update((all) => all.map((c) => (c.id === id ? { ...c, ...updated } : c)));
 		reviewLogs.update((logs) => [
 			...logs,
-			{
-				id: generateId(),
-				cardId: currentCard.id,
-				quality,
-				reviewedAt: new Date().toISOString()
-			}
+			{ id: generateId(), cardId: id, quality, reviewedAt: new Date().toISOString() }
 		]);
-
 		isFlipped = false;
+		if (anim === 'rise') setTimeout(() => (anim = ''), 320);
+	}
+
+	function onKeydown(e: KeyboardEvent) {
+		if (!currentCard) return;
+		if ((e.code === 'Space' || e.key === ' ') && !isFlipped) {
+			e.preventDefault();
+			handleFlip();
+			return;
+		}
+		if (!isFlipped) return;
+		if (e.key === '1') processReview(0);
+		if (e.key === '2') processReview(3);
+		if (e.key === '3') processReview(4);
+		if (e.key === '4') processReview(5);
 	}
 </script>
 
-<div class="container mx-auto flex min-h-[80vh] max-w-xl flex-col justify-center p-6 text-center">
-	<div class="fixed top-4 left-4">
-		<Button variant="ghost" href="/">
-			<ArrowLeft class="mr-2 h-4 w-4" /> Sair
-		</Button>
+<svelte:window onkeydown={onKeydown} />
+
+<div class="container mx-auto flex min-h-[80vh] max-w-[720px] flex-col justify-center px-5 sm:px-6 py-6">
+	<div class="fixed top-[57px] left-0 right-0 z-20 border-b border-border/70 bg-[color-mix(in_oklch,var(--bg)_92%,transparent)] backdrop-blur-[14px]">
+		<div class="mx-auto max-w-[720px] flex items-center justify-between gap-3 px-5 sm:px-6 py-2.5">
+			<a href="/" class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground">
+				<ArrowLeft class="size-[18px] [stroke-width:1.75]" /> {m['review.exit']()}
+			</a>
+			<div class="flex items-center gap-3">
+				<span class="font-mono text-[11px] font-bold tracking-[0.12em] uppercase text-muted-foreground"> <strong class="text-foreground tabular-nums">{counterText}</strong></span>
+				<div class="h-[3px] w-24 rounded-md bg-border overflow-hidden">
+					<div class="h-full bg-[var(--accent-text)] origin-left transition-[width] duration-300" style="width: {progress}%"></div>
+				</div>
+			</div>
+		</div>
 	</div>
 
+	<div class="pt-10">
 	{#if !currentCard}
-		<div class="animate-in space-y-6 duration-500 fade-in slide-in-from-bottom-4">
-			<h1 class="text-4xl font-bold text-primary">Parabéns! 🎉</h1>
-			<p class="text-xl text-muted-foreground">
-				Você revisou todos os cartões deste baralho por hoje.
+		<div class="space-y-6 text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+			<div class="mx-auto grid size-16 place-items-center rounded-md bg-[var(--accent-soft)] border border-[color-mix(in_oklch,var(--accent-text)_20%,transparent)] text-accent">
+				<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M12 5a7 7 0 1 0 0 14"/><path d="M12 5a7 7 0 0 1 7 7"/><path d="M12 19a7 7 0 0 1-7-7"/></svg>
+			</div>
+			<h1 class="font-display text-[34px] leading-none tracking-[-0.03em]">{m['review.done']()}</h1>
+			<p class="text-sm text-muted-foreground">
+				{#if totalAtStart > 0}
+					{totalAtStart === 1 ? m['review.doneBody.one']({ count: 1 }) : m['review.doneBody']({ count: totalAtStart })}
+				{:else}
+					{m['review.nonePending']()}
+				{/if}
 			</p>
-			<div class="flex justify-center gap-4">
-				<Button href="/" size="lg">Voltar ao Dashboard</Button>
+			<div class="flex justify-center gap-3">
+				<Button href="/" size="lg">{m['review.backHome']()}</Button>
 			</div>
 		</div>
 	{:else}
-		<div class="mb-8 flex items-center justify-between text-sm text-muted-foreground">
-			<span>Revisão em progresso</span>
-			<span>{dueCards.length} restantes</span>
+		<div class="mb-4 flex items-center justify-between">
+			<span class="font-mono text-[11px] font-bold tracking-[0.12em] uppercase text-muted-foreground">{m['review.progress']()}</span>
+			<span class="font-mono text-[11px] font-bold tracking-[0.08em] uppercase text-muted-foreground">{m['review.remaining']({ count: dueCards.length })}</span>
 		</div>
 
-		<div
-			class="perspective-1000 group relative h-80 w-full cursor-pointer ring-offset-background outline-none focus-visible:ring-2 focus-visible:ring-ring"
-			onclick={!isFlipped ? handleFlip : undefined}
-			onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && !isFlipped && handleFlip()}
-			role="button"
-			tabindex="0"
-		>
+		<div class="perspective-[1100px] mx-auto w-full max-w-[620px]">
 			<div
-				class="transform-style-3d relative h-full w-full transition-all duration-500 {isFlipped
-					? 'rotate-y-180'
-					: ''}"
+				class="relative h-[380px] w-full cursor-pointer rounded-lg border border-transparent transition-transform duration-[420ms] [transform-style:preserve-3d] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--ring)] motion-reduce:transition-none {isFlipped ? '[transform:rotateY(180deg)]' : ''} {anim === 'shake' ? 'animate-[shake_220ms_var(--ease-snappy)]' : ''} {anim === 'sink' ? 'scale-[0.98]' : ''} {anim === 'rise' ? 'animate-[riseFade_320ms_var(--ease-out)_forwards]' : ''}"
+				onclick={!isFlipped ? handleFlip : undefined}
+				onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && !isFlipped && handleFlip()}
+				role="button"
+				tabindex="0"
+				aria-label={m['review.cardAria']()}
 			>
-				<!-- Front -->
 				<Card.Root
-					class="absolute flex h-full w-full flex-col items-center justify-center border-2 p-8 shadow-lg backface-hidden"
+					class="absolute inset-0 flex flex-col items-center justify-center p-8 rounded-lg border border-border bg-card [backface-visibility:hidden] border-t-[6px] border-t-[var(--accent-text)] shadow-[0_10px_30px_color-mix(in_oklch,var(--fg)_7%,transparent)]"
 				>
-					<div class="mb-4 text-3xl font-semibold">{currentCard.front}</div>
-					<div class="absolute bottom-6 animate-pulse text-sm text-muted-foreground">
-						Toque para ver a resposta
-					</div>
+					<div class="font-mono text-[10px] font-bold tracking-[0.12em] uppercase text-accent mb-3">{m['review.front']()}</div>
+					<div class="text-center text-[18px] font-semibold leading-[1.5]">{currentCard.front}</div>
+					<div class="absolute bottom-6 text-xs text-muted-foreground">{m['review.flipHint']()}</div>
 				</Card.Root>
 
-				<!-- Back -->
 				<Card.Root
-					class="absolute flex h-full w-full rotate-y-180 flex-col items-center justify-center border-2 border-primary/20 bg-muted/30 p-8 shadow-lg backface-hidden"
+					class="absolute inset-0 flex flex-col items-center justify-center p-8 rounded-lg border border-border bg-[color-mix(in_oklch,var(--surface)_94%,var(--accent-soft))] [backface-visibility:hidden] [transform:rotateY(180deg)] border-t-[6px] border-t-[var(--accent-text)] shadow-[0_10px_30px_color-mix(in_oklch,var(--fg)_7%,transparent)]"
 				>
-					<div class="mb-4 text-sm tracking-widest text-muted-foreground uppercase">Resposta</div>
-					<div class="text-2xl font-medium">{currentCard.back}</div>
+					<div class="font-mono text-[10px] font-bold tracking-[0.12em] uppercase text-muted-foreground mb-3">{m['review.answer']()}</div>
+					<div class="text-center text-[15px] font-medium leading-[1.6] whitespace-pre-wrap">{currentCard.back}</div>
+					{#if showStamp}
+						<span class="pointer-events-none absolute right-4 top-4 rounded-[8px] border-[1.5px] border-[var(--accent-text)] bg-card px-2.5 py-1 font-mono text-[10px] font-extrabold tracking-[0.16em] uppercase text-accent -rotate-3 animate-[stampFall_380ms_var(--ease-snappy)_forwards]">{m['review.stamp']()}</span>
+					{/if}
 				</Card.Root>
 			</div>
 		</div>
 
-		<!-- Controls -->
 		{#if isFlipped}
-			<div
-				class="mt-8 grid animate-in grid-cols-4 gap-3 duration-300 fade-in slide-in-from-bottom-2"
-			>
-				<div class="flex flex-col gap-1">
-					<Button
-						variant="destructive"
-						onclick={() => processReview(0)}
-						class="h-14 text-lg font-bold">Errei</Button
-					>
-					<span class="text-xs text-muted-foreground">Recomeçar</span>
-				</div>
-				<div class="flex flex-col gap-1">
-					<Button
-						variant="secondary"
-						onclick={() => processReview(3)}
-						class="h-14 bg-orange-100 text-lg font-bold text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400"
-						>Difícil</Button
-					>
-					<span class="text-xs text-muted-foreground">Log</span>
-				</div>
-				<div class="flex flex-col gap-1">
-					<Button
-						variant="default"
-						onclick={() => processReview(4)}
-						class="h-14 bg-blue-100 text-lg font-bold text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400"
-						>Bom</Button
-					>
-					<span class="text-xs text-muted-foreground">Médio</span>
-				</div>
-				<div class="flex flex-col gap-1">
-					<Button
-						variant="outline"
-						onclick={() => processReview(5)}
-						class="h-14 border-green-500 text-lg font-bold text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
-						>Fácil</Button
-					>
-					<span class="text-xs text-muted-foreground">Longo</span>
-				</div>
+			<div class="mt-6 grid grid-cols-4 gap-2 sm:gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+				<button onclick={() => processReview(0)} aria-label={m['review.againAria']()} class="flex min-h-[84px] flex-col items-center justify-center gap-1 rounded-md border border-border bg-card p-3 transition-[transform,border-color,background] duration-150 hover:-translate-y-px hover:border-[var(--q-errei)] hover:bg-[color-mix(in_oklch,var(--q-errei)_8%,var(--surface))] active:scale-[0.98]">
+					<strong class="text-[13px] text-[var(--q-errei)]">{m['review.again']()}</strong>
+					<span class="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">{m['review.againHint']()}</span>
+					<kbd class="mt-1 rounded-[6px] border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">1</kbd>
+				</button>
+				<button onclick={() => processReview(3)} aria-label={m['review.hardAria']()} class="flex min-h-[84px] flex-col items-center justify-center gap-1 rounded-md border border-border bg-card p-3 transition-[transform,border-color,background] duration-150 hover:-translate-y-px hover:border-[var(--q-dificil)] hover:bg-[color-mix(in_oklch,var(--q-dificil)_8%,var(--surface))] active:scale-[0.98]">
+					<strong class="text-[13px] text-[var(--q-dificil)]">{m['review.hard']()}</strong>
+					<span class="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">{m['review.hardHint']()}</span>
+					<kbd class="mt-1 rounded-[6px] border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">2</kbd>
+				</button>
+				<button onclick={() => processReview(4)} aria-label={m['review.goodAria']()} class="flex min-h-[84px] flex-col items-center justify-center gap-1 rounded-md border border-border bg-card p-3 transition-[transform,border-color,background] duration-150 hover:-translate-y-px hover:border-[var(--q-bom)] hover:bg-[color-mix(in_oklch,var(--q-bom)_8%,var(--surface))] active:scale-[0.98]">
+					<strong class="text-[13px] text-[var(--q-bom)]">{m['review.good']()}</strong>
+					<span class="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">{m['review.goodHint']()}</span>
+					<kbd class="mt-1 rounded-[6px] border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">3</kbd>
+				</button>
+				<button onclick={() => processReview(5)} aria-label={m['review.easyAria']()} class="flex min-h-[84px] flex-col items-center justify-center gap-1 rounded-md border border-border bg-card p-3 transition-[transform,border-color,background] duration-150 hover:-translate-y-px hover:border-[var(--q-facil)] hover:bg-[color-mix(in_oklch,var(--q-facil)_8%,var(--surface))] active:scale-[0.98]">
+					<strong class="text-[13px] text-[var(--q-facil)]">{m['review.easy']()}</strong>
+					<span class="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">{m['review.easyHint']()}</span>
+					<kbd class="mt-1 rounded-[6px] border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">4</kbd>
+				</button>
 			</div>
+			<p class="mt-3 text-center font-mono text-[10px] uppercase tracking-wide text-muted-foreground">{m['review.shortcuts']()}</p>
 		{:else}
-			<div class="mt-8 flex h-14 items-center justify-center">
-				<Button size="lg" class="w-full max-w-xs" onclick={handleFlip}>Mostrar Resposta</Button>
+			<div class="mt-6 flex justify-center">
+				<Button size="lg" class="w-full max-w-xs" onclick={handleFlip}>{m['review.show']()}</Button>
 			</div>
 		{/if}
 	{/if}
+	</div>
 </div>
 
 <style>
-	.perspective-1000 {
-		perspective: 1000px;
-	}
-	.transform-style-3d {
-		transform-style: preserve-3d;
-	}
-	:global(.backface-hidden) {
-		backface-visibility: hidden;
-	}
-	.rotate-y-180 {
-		transform: rotateY(180deg);
-	}
+	@keyframes shake { 0%,100% { transform: translateX(0) rotateY(180deg); } 20% { transform: translateX(-5px) rotateY(180deg); } 40% { transform: translateX(5px) rotateY(180deg); } 60% { transform: translateX(-3px) rotateY(180deg); } 80% { transform: translateX(3px) rotateY(180deg); } }
+	@keyframes stampFall { 0% { opacity: 0; transform: scale(1.4) rotate(-8deg); } 60% { opacity: 1; transform: scale(0.98) rotate(-3deg); } 100% { opacity: 1; transform: scale(1) rotate(-3deg); } }
+	@keyframes riseFade { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-10px); opacity: 0.98; } }
 </style>

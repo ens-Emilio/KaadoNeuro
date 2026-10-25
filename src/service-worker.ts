@@ -8,7 +8,7 @@ const ASSETS = [
     ...files  // everything in `static`
 ];
 
-self.addEventListener('install', (event: any) => {
+self.addEventListener('install', (event: ExtendableEvent) => {
     // Create a new cache and add all files to it
     async function addFilesToCache() {
         const cache = await caches.open(CACHE);
@@ -18,7 +18,7 @@ self.addEventListener('install', (event: any) => {
     event.waitUntil(addFilesToCache());
 });
 
-self.addEventListener('activate', (event: any) => {
+self.addEventListener('activate', (event: ExtendableEvent) => {
     // Remove previous cached data from disk
     async function deleteOldCaches() {
         for (const key of await caches.keys()) {
@@ -29,7 +29,7 @@ self.addEventListener('activate', (event: any) => {
     event.waitUntil(deleteOldCaches());
 });
 
-self.addEventListener('fetch', (event: any) => {
+self.addEventListener('fetch', (event: FetchEvent) => {
     // ignore POST requests etc
     if (event.request.method !== 'GET') return;
     // ignore requests for other domains?
