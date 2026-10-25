@@ -29,3 +29,9 @@ project.inlang/cache/
 
 *storybook.log
 storybook-static
+
+# Local runtime data
+data/
+*.db
+*.db-wal
+*.db-shm
