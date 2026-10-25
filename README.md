@@ -1,6 +1,6 @@
-# KaadoNeuro (MVP)
+# KaadoNeuro
 
-Um aplicativo de Flashcards PWA (Progressive Web App) focado em eficiência e simplicidade, utilizando o algoritmo de repetição espaçada SM-2 para otimizar o aprendizado.
+Aplicativo PWA de flashcards focado em simplicidade, com repetição espaçada SM-2 e funcionamento local-first.
 
 ## 🚀 Visão Geral
 
@@ -10,26 +10,29 @@ O **KaadoNeuro** é uma aplicação **Local-First**, o que significa que todos o
 
 -   **Algoritmo SM-2**: Implementação fiel do algoritmo SuperMemo 2 para calcular os intervalos ideais de revisão.
 -   **Organização em Baralhos**: Crie múltiplos baralhos para separar seus tópicos de estudo.
--   **Sistema de Importação**: Adicione cartões em massa via arquivos JSON ou texto/markdown simples.
--   **Gamificação**: Acompanhe seu progresso diário com o contador de "Streak" (dias consecutivos).
+-   **Importação Flexível**: Adicione cartões em massa via arquivo (JSON, Markdown, TXT) ou cole o texto diretamente.
+-   **Gamificação**: Acompanhe seu progresso diário com o contador de "Streak" (dias consecutivos) e saudações dinâmicas (Bom dia/tarde/noite).
 -   **Estatísticas**: Visualize o volume de estudos e a qualidade das suas revisões.
--   **PWA**: Instale no seu dispositivo (celular ou desktop) e estude offline.
--   **Interface Moderna**: Design limpo e responsivo com temas claro/escuro (baseado no sistema/Tailwind).
+-   **PWA Completo**: Instale no seu dispositivo (celular ou desktop) e estude totalmente offline.
+-   **Interface editorial**: temas claro e escuro, 13 idiomas e layout responsivo.
+-   **IA opcional**: conecte seu próprio provider no navegador.
+-   **Backup**: exportação e importação completas pelo próprio app.
 
 ## 🛠️ Stack Tecnológico
 
 -   **Frontend**: [Svelte 5](https://svelte.dev/) + [SvelteKit](https://kit.svelte.dev/)
 -   **Estilização**: [Tailwind CSS](https://tailwindcss.com/) + [shadcn-svelte](https://www.shadcn-svelte.com/)
--   **Persistência**: `svelte-local-storage-store` (Armazenamento local persistente e reativo)
+-   **Persistência**: armazenamento local no dispositivo
+-   **Distribuição**: build estático, PWA instalável e qualquer hospedagem de arquivos
 -   **Ícones**: Lucide Icons
--   **i18n**: Paraglide JS (Configurado para expansão futura)
+-   **Hospedagem**: qualquer host estático, ou execução local
 
 ## 📂 Estrutura do Projeto
 
 ```
 src/
 ├── lib/
-│   ├── components/     # Componentes de UI reutilizáveis (botões, cards, inputs)
+│   ├── components/     # Componentes de UI reutilizáveis (botões, cards, inputs, dialogs)
 │   ├── sm2.ts          # Lógica do algoritmo de repetição espaçada (SM-2)
 │   ├── stores.ts       # Gerenciamento de estado global e persistência (Decks, Cards, Logs)
 │   ├── types.ts        # Definições de tipos TypeScript (Flashcard, Deck, ReviewLog)
@@ -76,17 +79,19 @@ Pré-requisitos: Node.js (v18+) e gerenciador de pacotes (npm, yarn ou pnpm).
 
 ## 📤 Importação de Cartões
 
-Na tela de edição de baralho, você pode importar arquivos:
+Na tela de edição de baralho, clique no botão **"Importar"** para abrir as opções:
 
-**Formato JSON (.json):**
-```json
-[
-  { "front": "Pergunta", "back": "Resposta" },
-  { "front": "Termo", "back": "Definição" }
-]
-```
+### 1. Aba Arquivo
+Arraste ou selecione arquivos `.json`, `.md` ou `.txt`.
 
-**Formato Texto/Markdown (.txt, .md):**
+### 2. Aba Texto
+Cole seu conteúdo diretamente. Ideal para notas rápidas ou copiar/colar do ChatGPT.
+*Nota: Limite de segurança de 50.000 caracteres por importação.*
+
+**Formatos Aceitos:**
+
+**Texto/Markdown (Recomendado):**
+Separe os cartões com `---`. A primeira linha é a Frente, o resto é o Verso.
 ```markdown
 # Pergunta ou Frente do Cartão
 Conteúdo da resposta ou verso.
@@ -95,6 +100,43 @@ Pode ter múltiplas linhas.
 # Próxima Pergunta
 Próxima resposta.
 ```
+
+**JSON:**
+```json
+[
+  { "front": "Pergunta", "back": "Resposta" },
+  { "front": "Termo", "back": "Definição" }
+]
+```
+
+## Configuração de IA
+
+Acesse **IA** na navegação principal ou `/settings/ai` para conectar um provedor próprio e conferir os modelos disponíveis.
+
+Providers disponíveis:
+
+- Anthropic
+- OpenAI
+- Google Gemini
+- OpenRouter
+- OpenAI-compatible, com URL base própria
+
+A chave é enviada ao endpoint server-side do próprio app e usada somente durante a requisição. A configuração fica no `localStorage` deste dispositivo. O app não envia a chave para terceiros além do provider escolhido.
+
+O fluxo de geração mostra uma prévia editável antes de gravar. Nenhum baralho ou cartão é salvo sem confirmação.
+
+### Limites
+
+- até 30 cartões por lote;
+- até 12.000 caracteres de contexto por geração;
+- timeout de 45 segundos no provider;
+- resposta precisa seguir o schema JSON interno.
+
+### Segurança
+
+- a chave não entra em URL, log ou telemetria;
+- providers compatíveis remotos exigem HTTPS;
+- HTTP sem TLS é aceito somente em `localhost` e `127.0.0.1`.
 
 ---
 *Desenvolvido por **ens-Emilio** com foco em performance e simplicidade.*

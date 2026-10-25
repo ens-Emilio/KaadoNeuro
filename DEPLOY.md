@@ -1,43 +1,51 @@
-# Hospedagem Gratuita do KaadoNeuro
+# Hospedagem
 
-O projeto está configurado para ser hospedado no **Netlify**, que oferece um plano gratuito excelente, suporte nativo ao SvelteKit e HTTPS automático.
+O KaadoNeuro é um site estático e local-first. Não exige servidor de aplicação nem banco de dados remoto.
 
-## Opção 1: Via GitHub/GitLab (Recomendado)
+## Rodar no PC do usuário
 
-Sempre que você der `git push`, o site atualizará automaticamente.
+```bash
+npm ci
+npm run dev
+```
 
-1.  Crie um repositório no [GitHub](https://github.com/new).
-2.  Envie seu código:
-    ```bash
-    git init
-    git add .
-    git commit -m "Initial commit"
-    git branch -M main
-    git remote add origin https://github.com/SEU_USUARIO/NOVO_REPO.git
-    git push -u origin main
-    ```
-3.  Acesse [app.netlify.com](https://app.netlify.com/).
-4.  Clique em **"Add new site"** -> **"Import an existing project"**.
-5.  Selecione **GitHub** e escolha o repositório que você criou.
-6.  O Netlify detectará as configurações automaticamente. Clique em **"Deploy site"**.
+Para gerar a versão instalável:
 
-## Opção 2: Manual (Drag & Drop)
+```bash
+npm run build
+npm run preview
+```
 
-Se não quiser usar Git agora:
+## Hospedar
 
-1.  No seu terminal, gere a pasta de build:
-    ```bash
-    npm run build
-    ```
-    *(Certifique-se que o `svelte.config.js` está usando `adapter-static` para gerar uma pasta `build` completa, ou use a CLI do Netlify para deploy manual)*.
+Publique o conteúdo da pasta `build` em qualquer host estático com HTTPS, por exemplo:
 
-    **Nota:** Como estamos usando `@sveltejs/adapter-netlify`, a opção 1 é muito melhor. A opção 2 requer instalar a CLI do Netlify: `npm install netlify-cli -g` e rodar `netlify deploy --prod`.
+- GitHub Pages;
+- Cloudflare Pages;
+- Netlify;
+- Vercel;
+- nginx, Caddy ou outro servidor de arquivos.
 
-## Configurações Adicionais (Opcional)
+Configuração de build em todos os casos:
 
-Se o deploy falhar ou você quiser mudar algo, verifique:
+- comando: `npm run build`
+- diretório publicado: `build`
+- fallback/SPA: `index.html`
 
--   **Build command**: `npm run build`
--   **Publish directory**: `build` (ou `.netlify` dependendo da versão do adaptador, mas o padrão costuma funcionar).
+## Atualizações
 
-O arquivo `netlify.toml` na raiz já contém as configurações ideais para cache e PWA.
+O service worker mantém os arquivos em cache. Após publicar uma nova versão, o usuário recebe a atualização na próxima visita.
+
+## IA
+
+O provider de IA é configurado pelo usuário no próprio navegador. A chave fica armazenada somente naquele dispositivo e não existe backend do KaadoNeuro para recebê-la.
+
+## Backup
+
+A página **Tutorial** explica o formato de importação. O backup completo está disponível nas funções de importação e exportação da interface.
+
+## Limites do modelo
+
+- Os dados pertencem ao navegador do usuário; limpar os dados do site apaga o conteúdo.
+- Não há sincronização entre dispositivos.
+- Para transferir dados, use o backup em JSON.
