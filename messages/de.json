@@ -198,5 +198,11 @@
   "ai.modelsChecking": "Modelle werden geprüft...",
   "ai.modelsFound": "{count} Modelle verfügbar. Wähle unten eines.",
   "ai.modelsChoose": "Modelle, auf die dieser Schlüssel zugreifen kann",
-  "error.models": "Modelle konnten nicht geladen werden."
+  "error.models": "Modelle konnten nicht geladen werden.",
+  "tutorial.backupTitle": "Daten sichern",
+  "tutorial.backupBody": "Deine Daten liegen in diesem Browser. Exportiere eine Datei für eine Kopie oder ein anderes Gerät.",
+  "tutorial.export": "Backup exportieren",
+  "tutorial.import": "Backup importieren",
+  "tutorial.backupDone": "Backup importiert.",
+  "tutorial.backupError": "Ungültige Backup-Datei."
 }

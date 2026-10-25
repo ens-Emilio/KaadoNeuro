@@ -198,5 +198,11 @@
   "ai.modelsChecking": "Modeller kontrol ediliyor...",
   "ai.modelsFound": "{count} model mevcut. Aşağıdan birini seç.",
   "ai.modelsChoose": "Bu anahtarla erişilebilen modeller",
-  "error.models": "Model listesi alınamadı."
+  "error.models": "Model listesi alınamadı.",
+  "tutorial.backupTitle": "Verilerinizi yedekleyin",
+  "tutorial.backupBody": "Verileriniz bu tarayıcıda. Kopya tutmak veya başka cihaza taşımak için dosya dışa aktarın.",
+  "tutorial.export": "Yedeği dışa aktar",
+  "tutorial.import": "Yedeği içe aktar",
+  "tutorial.backupDone": "Yedek içe aktarıldı.",
+  "tutorial.backupError": "Geçersiz yedek dosyası."
 }

@@ -1,8 +1,24 @@
-<script>
+<script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
-	import { ArrowLeft, BookOpen, Upload, Brain, FileText } from '@lucide/svelte';
+	import { ArrowLeft, BookOpen, Upload, Brain, FileText, Download } from '@lucide/svelte';
+	import { downloadSnapshot, applySnapshot } from '$lib/backup.js';
 	import * as m from '$lib/paraglide/messages.js';
+
+	let backupStatus = $state('');
+
+	async function importBackup(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		try {
+			applySnapshot(JSON.parse(await file.text()));
+			backupStatus = m['tutorial.backupDone']();
+		} catch {
+			backupStatus = m['tutorial.backupError']();
+		}
+		input.value = '';
+	}
 </script>
 
 <div class="container mx-auto max-w-3xl px-5 sm:px-6 py-8 pb-20">
@@ -72,6 +88,26 @@
 					<li><strong class="text-foreground">{m['tutorial.easy']()}</strong> {m['tutorial.easyDesc']()}</li>
 				</ul>
 				<p class="font-mono text-xs">{m['tutorial.shortcuts']()}</p>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root class="rounded-lg">
+			<Card.Header>
+				<Card.Title class="flex items-center gap-2 text-sm">
+					<Download class="size-[18px] text-accent [stroke-width:1.75]" />
+					{m['tutorial.backupTitle']()}
+				</Card.Title>
+			</Card.Header>
+			<Card.Content class="space-y-3 text-sm text-muted-foreground">
+				<p>{m['tutorial.backupBody']()}</p>
+				<div class="flex flex-wrap gap-2">
+					<Button onclick={downloadSnapshot} variant="outline">{m['tutorial.export']()}</Button>
+					<label class="inline-flex cursor-pointer items-center rounded-md border border-border px-4 py-2 text-[13px] font-semibold">
+						{m['tutorial.import']()}
+						<input type="file" accept="application/json" class="sr-only" onchange={importBackup} />
+					</label>
+				</div>
+				{#if backupStatus}<p role="status">{backupStatus}</p>{/if}
 			</Card.Content>
 		</Card.Root>
 

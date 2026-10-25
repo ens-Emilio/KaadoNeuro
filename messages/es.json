@@ -198,5 +198,11 @@
   "ai.modelsChecking": "Comprobando modelos...",
   "ai.modelsFound": "{count} modelos disponibles. Elige uno abajo.",
   "ai.modelsChoose": "Modelos accesibles con esta clave",
-  "error.models": "Error al listar modelos."
+  "error.models": "Error al listar modelos.",
+  "tutorial.backupTitle": "Copia de seguridad",
+  "tutorial.backupBody": "Tus datos viven en este navegador. Exporta un archivo para guardar una copia o pasarlos a otro dispositivo.",
+  "tutorial.export": "Exportar copia",
+  "tutorial.import": "Importar copia",
+  "tutorial.backupDone": "Copia importada.",
+  "tutorial.backupError": "Archivo de copia no válido."
 }

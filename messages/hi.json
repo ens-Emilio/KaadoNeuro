@@ -198,5 +198,11 @@
   "ai.modelsChecking": "मॉडल जांचे जा रहे हैं...",
   "ai.modelsFound": "{count} मॉडल उपलब्ध। नीचे से चुनें।",
   "ai.modelsChoose": "इस कुंजी से उपलब्ध मॉडल",
-  "error.models": "मॉडल सूची लाने में विफल."
+  "error.models": "मॉडल सूची लाने में विफल.",
+  "tutorial.backupTitle": "अपना डेटा बैकअप करें",
+  "tutorial.backupBody": "आपका डेटा इस ब्राउज़र में है। प्रति रखने या दूसरे डिवाइस पर ले जाने के लिए फ़ाइल निर्यात करें।",
+  "tutorial.export": "बैकअप निर्यात करें",
+  "tutorial.import": "बैकअप आयात करें",
+  "tutorial.backupDone": "बैकअप आयात हुआ।",
+  "tutorial.backupError": "बैकअप फ़ाइल अमान्य है।"
 }

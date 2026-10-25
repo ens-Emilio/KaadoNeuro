@@ -198,5 +198,11 @@
   "ai.modelsChecking": "Memeriksa model...",
   "ai.modelsFound": "{count} model tersedia. Pilih satu di bawah.",
   "ai.modelsChoose": "Model yang bisa diakses kunci ini",
-  "error.models": "Gagal mengambil daftar model."
+  "error.models": "Gagal mengambil daftar model.",
+  "tutorial.backupTitle": "Cadangkan data Anda",
+  "tutorial.backupBody": "Data Anda tersimpan di browser ini. Ekspor file untuk menyimpan salinan atau pindah perangkat.",
+  "tutorial.export": "Ekspor cadangan",
+  "tutorial.import": "Impor cadangan",
+  "tutorial.backupDone": "Cadangan diimpor.",
+  "tutorial.backupError": "File cadangan tidak valid."
 }

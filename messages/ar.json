@@ -198,5 +198,11 @@
   "ai.modelsChecking": "جارٍ التحقق من النماذج...",
   "ai.modelsFound": "{count} نماذج متاحة. اختر واحدًا أدناه.",
   "ai.modelsChoose": "النماذج المتاحة بهذا المفتاح",
-  "error.models": "فشل جلب قائمة النماذج."
+  "error.models": "فشل جلب قائمة النماذج.",
+  "tutorial.backupTitle": "انسخ بياناتك احتياطيًا",
+  "tutorial.backupBody": "بياناتك في هذا المتصفح. صدّر ملفًا للاحتفاظ بنسخة أو نقلها إلى جهاز آخر.",
+  "tutorial.export": "تصدير النسخة",
+  "tutorial.import": "استيراد النسخة",
+  "tutorial.backupDone": "تم استيراد النسخة.",
+  "tutorial.backupError": "ملف النسخة غير صالح."
 }

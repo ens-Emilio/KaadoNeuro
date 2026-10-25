@@ -198,5 +198,11 @@
   "ai.modelsChecking": "모델 확인 중...",
   "ai.modelsFound": "{count}개 모델 사용 가능. 아래에서 선택하세요.",
   "ai.modelsChoose": "이 키로 접근 가능한 모델",
-  "error.models": "모델 목록을 가져오지 못했습니다."
+  "error.models": "모델 목록을 가져오지 못했습니다.",
+  "tutorial.backupTitle": "데이터 백업",
+  "tutorial.backupBody": "데이터는 이 브라우저에 있습니다. 파일로 내보내 보관하거나 다른 기기로 옮기세요.",
+  "tutorial.export": "백업 내보내기",
+  "tutorial.import": "백업 가져오기",
+  "tutorial.backupDone": "백업을 가져왔습니다.",
+  "tutorial.backupError": "유효하지 않은 백업 파일입니다."
 }

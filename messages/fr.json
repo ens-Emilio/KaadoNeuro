@@ -198,5 +198,11 @@
   "ai.modelsChecking": "Vérification des modèles...",
   "ai.modelsFound": "{count} modèles disponibles. Choisissez-en un ci-dessous.",
   "ai.modelsChoose": "Modèles accessibles avec cette clé",
-  "error.models": "Échec de la liste des modèles."
+  "error.models": "Échec de la liste des modèles.",
+  "tutorial.backupTitle": "Sauvegarder vos données",
+  "tutorial.backupBody": "Vos données restent dans ce navigateur. Exportez un fichier pour conserver une copie ou changer d’appareil.",
+  "tutorial.export": "Exporter la sauvegarde",
+  "tutorial.import": "Importer une sauvegarde",
+  "tutorial.backupDone": "Sauvegarde importée.",
+  "tutorial.backupError": "Fichier de sauvegarde invalide."
 }

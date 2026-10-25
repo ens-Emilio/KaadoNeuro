@@ -198,5 +198,11 @@
   "ai.modelsChecking": "Checking models...",
   "ai.modelsFound": "{count} models available. Pick one below.",
   "ai.modelsChoose": "Models accessible by this key",
-  "error.models": "Failed to list models."
+  "error.models": "Failed to list models.",
+  "tutorial.backupTitle": "Back up your data",
+  "tutorial.backupBody": "Your data lives in this browser. Export a file to keep a copy or move it to another device.",
+  "tutorial.export": "Export backup",
+  "tutorial.import": "Import backup",
+  "tutorial.backupDone": "Backup imported.",
+  "tutorial.backupError": "Invalid backup file."
 }

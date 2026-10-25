@@ -198,5 +198,11 @@
   "ai.modelsChecking": "Đang kiểm tra mô hình...",
   "ai.modelsFound": "{count} mô hình khả dụng. Chọn một ở dưới.",
   "ai.modelsChoose": "Mô hình truy cập được bằng khóa này",
-  "error.models": "Không lấy được danh sách mô hình."
+  "error.models": "Không lấy được danh sách mô hình.",
+  "tutorial.backupTitle": "Sao lưu dữ liệu",
+  "tutorial.backupBody": "Dữ liệu nằm trong trình duyệt này. Xuất tệp để giữ bản sao hoặc chuyển thiết bị.",
+  "tutorial.export": "Xuất bản sao lưu",
+  "tutorial.import": "Nhập bản sao lưu",
+  "tutorial.backupDone": "Đã nhập bản sao lưu.",
+  "tutorial.backupError": "Tệp sao lưu không hợp lệ."
 }

@@ -198,5 +198,11 @@
   "ai.modelsChecking": "モデルを確認中...",
   "ai.modelsFound": "{count} 個のモデルがあります。下から選択してください。",
   "ai.modelsChoose": "このキーで利用可能なモデル",
-  "error.models": "モデル一覧の取得に失敗しました。"
+  "error.models": "モデル一覧の取得に失敗しました。",
+  "tutorial.backupTitle": "データをバックアップ",
+  "tutorial.backupBody": "データはこのブラウザにあります。ファイルに書き出して保存するか、別の端末へ移せます。",
+  "tutorial.export": "バックアップを書き出す",
+  "tutorial.import": "バックアップを読み込む",
+  "tutorial.backupDone": "バックアップを読み込みました。",
+  "tutorial.backupError": "無効なバックアップファイルです。"
 }
