@@ -26,6 +26,7 @@ export interface AIGenerationInput {
 	source: string;
 	count: number;
 	deckName?: string;
+	imageBase64?: string;
 }
 
 export const AI_CARD_COUNTS = [10, 20, 30] as const;
@@ -36,6 +37,7 @@ export interface AIProviderPreset {
 	baseUrl: string;
 	defaultModel: string;
 	requiresBaseUrl: boolean;
+	supportsVision?: boolean;
 }
 
 export const AI_PROVIDER_PRESETS: AIProviderPreset[] = [
@@ -44,34 +46,39 @@ export const AI_PROVIDER_PRESETS: AIProviderPreset[] = [
 		label: 'Anthropic',
 		baseUrl: 'https://api.anthropic.com/v1/messages',
 		defaultModel: 'claude-haiku-4-5',
-		requiresBaseUrl: false
+		requiresBaseUrl: false,
+		supportsVision: true
 	},
 	{
 		id: 'openai',
 		label: 'OpenAI',
 		baseUrl: 'https://api.openai.com/v1/chat/completions',
 		defaultModel: 'gpt-4o-mini',
-		requiresBaseUrl: false
+		requiresBaseUrl: false,
+		supportsVision: true
 	},
 	{
 		id: 'gemini',
 		label: 'Google Gemini',
 		baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
 		defaultModel: 'gemini-2.0-flash',
-		requiresBaseUrl: false
+		requiresBaseUrl: false,
+		supportsVision: true
 	},
 	{
 		id: 'openrouter',
 		label: 'OpenRouter',
 		baseUrl: 'https://openrouter.ai/api/v1/chat/completions',
 		defaultModel: 'openai/gpt-4o-mini',
-		requiresBaseUrl: false
+		requiresBaseUrl: false,
+		supportsVision: true
 	},
 	{
 		id: 'compatible',
 		label: 'OpenAI-compatible',
 		baseUrl: '',
 		defaultModel: 'local-model',
-		requiresBaseUrl: true
+		requiresBaseUrl: true,
+		supportsVision: false
 	}
 ];

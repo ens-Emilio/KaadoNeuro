@@ -1,15 +1,16 @@
 import { AIProposalSchema } from './schemas.js';
-import type { AICardProposal, AIGenerationInput, AIProposal } from './types.js';
+import type { AICardProposal, AIGenerationInput, AIProposal, AIProvider } from './types.js';
 
 const MAX_SOURCE_LENGTH = 12000;
 
-export function buildGenerationPrompt(input: AIGenerationInput): string {
+export function buildGenerationPrompt(input: AIGenerationInput): string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> {
 	const kindLabel = input.kind === 'deck' ? 'baralho completo' : 'lote de cartões';
-	return `Você gera material de revisão para um app de flashcards.
+	const textPrompt = `Você gera material de revisão para um app de flashcards.
 Tarefa: criar ${kindLabel}.
 Fonte ou tema: ${input.source}
 Quantidade de cartões: ${input.count}
 Nome do baralho desejado: ${input.deckName ?? ''}
+${input.imageBase64 ? 'A imagem anexada contém conteúdo adicional para gerar os cartões. Analise a imagem junto com o texto.' : ''}
 Responda APENAS JSON válido.
 Formato:
 {
@@ -25,6 +26,13 @@ Regras:
 - sem explicações
 - sem repetição
 - sem texto fora do JSON`;
+	if (input.imageBase64) {
+		return [
+			{ type: 'text', text: textPrompt },
+			{ type: 'image_url', image_url: { url: input.imageBase64 } }
+		];
+	}
+	return textPrompt;
 }
 
 export function parseAIProposal(raw: string): AIProposal {

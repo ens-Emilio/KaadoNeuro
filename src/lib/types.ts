@@ -3,6 +3,7 @@ export interface Flashcard {
     deckId: string;
     front: string;
     back: string;
+    tags: string[]; // tags para filtragem cruzada entre decks
 
     // SM-2 params
     interval: number; // dias até a próxima revisão

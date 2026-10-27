@@ -7,11 +7,11 @@
 	import { cards, decks, generateId } from '$lib/stores.js';
 	import { aiConfig, normalizeAIConfig } from '$lib/ai/store.js';
 	import { AI_CARD_COUNTS, type AICardProposal, type AIProposal } from '$lib/ai/types.js';
-	import { NotebookPen, Loader2, Check, X } from '@lucide/svelte';
+	import { NotebookPen, Loader2, Check, X, Image as ImageIcon } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
 	import AIGenerateTrigger from './ai-generate-trigger.svelte';
 	import * as m from '$lib/paraglide/messages.js';
-	import { generateProposal } from '$lib/ai/client.js';
+	import { generateProposal, supportsVision } from '$lib/ai/client.js';
 	import { buildGenerationPrompt } from '$lib/ai/prompt.js';
 
 	type Props = {
@@ -30,8 +30,31 @@
 	let editedDeckName = $state('');
 	let source = $state('');
 	let count = $state(AI_CARD_COUNTS[0]);
-
+	let imageBase64 = $state<string | undefined>(undefined);
+	const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 	const config = $derived(normalizeAIConfig($aiConfig));
+	const hasVision = $derived(config ? supportsVision(config) : false);
+
+	function handleImageSelect(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		if (file.size > MAX_IMAGE_SIZE) {
+			error = m['ai.imageTooLarge']();
+			input.value = '';
+			return;
+		}
+		const reader = new FileReader();
+		reader.onload = () => {
+			imageBase64 = reader.result as string;
+			error = '';
+		};
+		reader.readAsDataURL(file);
+	}
+
+	function removeImage() {
+		imageBase64 = undefined;
+	}
 
 	async function generate() {
 		if (!config || !source.trim()) return;
@@ -44,7 +67,8 @@
 					kind: deckId ? 'cards' : 'deck',
 					source: source.trim(),
 					count,
-					deckName: deckId ? deckName : undefined
+					deckName: deckId ? deckName : undefined,
+					imageBase64
 				})
 			);
 			proposal = generated;
@@ -69,6 +93,7 @@
 			deckId: targetDeckId,
 			front: c.front.trim(),
 			back: c.back.trim(),
+			tags: [],
 			interval: 0,
 			repetitions: 0,
 			easeFactor: 2.5,
@@ -80,7 +105,7 @@
 		proposal = null;
 		editedCards = [];
 		source = '';
-		onApplied?.();
+		imageBase64 = undefined;
 		if (!deckId) goto(`/decks/${targetDeckId}`);
 	}
 
@@ -126,6 +151,27 @@
 							<option value={n}>{m['aiGen.countN']({ count: n })}</option>
 						{/each}
 					</select>
+				</div>
+				<div class="space-y-1.5">
+					<Label>{m['ai.uploadImage']()}</Label>
+					{#if imageBase64}
+						<div class="relative inline-block">
+							<img src={imageBase64} alt={m['ai.imagePreview']()} class="h-24 w-24 rounded-md border border-border object-cover" />
+							<button onclick={removeImage} class="absolute -right-2 -top-2 rounded-full bg-destructive p-0.5 text-destructive-foreground shadow-sm hover:bg-destructive/90" aria-label={m['ai.removeImage']()}>
+								<X class="size-3.5" />
+							</button>
+						</div>
+					{:else}
+						<label class="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm hover:bg-muted/50">
+							<ImageIcon class="size-4 text-muted-foreground" />
+							<span>{m['ai.uploadImage']()}</span>
+							<input type="file" accept="image/*" class="hidden" onchange={handleImageSelect} />
+						</label>
+					{/if}
+					<p class="text-xs text-muted-foreground">{m['ai.imageHint']()}</p>
+					{#if !hasVision && imageBase64}
+						<p class="text-xs text-[var(--q-dificil)]">{m['ai.multimodalUnsupported']()}</p>
+					{/if}
 				</div>
 				{#if error}
 					<p class="rounded-md border border-[var(--q-errei)]/30 bg-[color-mix(in_oklch,var(--q-errei)_8%,transparent)] px-3 py-2 text-xs text-[var(--q-errei)]">{error}</p>

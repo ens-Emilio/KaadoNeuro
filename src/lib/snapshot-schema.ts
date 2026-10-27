@@ -9,7 +9,8 @@ const CardSchema = z.object({
 	repetitions: z.number().int().min(0),
 	easeFactor: z.number().finite().min(1.3),
 	dueDate: z.string().datetime(),
-	createdAt: z.string().datetime()
+	createdAt: z.string().datetime(),
+	tags: z.array(z.string()).default([])
 });
 
 const DeckSchema = z.object({

@@ -1,5 +1,6 @@
 import { parseAIProposal } from './prompt.js';
-import type { AIConfig } from './types.js';
+import type { AIConfig, AIProvider } from './types.js';
+import { AI_PROVIDER_PRESETS } from './types.js';
 
 function endpointFor(config: AIConfig, path: 'chat' | 'models') {
 	switch (config.provider) {
@@ -62,13 +63,34 @@ function textFrom(body: unknown, provider: AIConfig['provider']) {
 	throw new Error('Resposta sem conteúdo textual.');
 }
 
-function bodyFor(config: AIConfig, prompt: string) {
-	if (config.provider === 'anthropic') return { model: config.model, max_tokens: 5000, messages: [{ role: 'user', content: prompt }] };
-	if (config.provider === 'gemini') return { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 5000 } };
-	return { model: config.model, messages: [{ role: 'system', content: 'Responda somente JSON válido.' }, { role: 'user', content: prompt }], temperature: 0.3 };
+type PromptContent = string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>;
+
+function providerSupportsVision(provider: AIProvider): boolean {
+	return AI_PROVIDER_PRESETS.find((p) => p.id === provider)?.supportsVision ?? false;
 }
 
-async function request(config: AIConfig, prompt: string) {
+function bodyFor(config: AIConfig, prompt: PromptContent) {
+	const isMultimodal = Array.isArray(prompt);
+	if (isMultimodal && !providerSupportsVision(config.provider)) {
+		throw new Error('Este provedor não suporta imagens.');
+	}
+	if (config.provider === 'anthropic') {
+		const content = isMultimodal
+			? prompt.map((p) => p.type === 'text' ? { type: 'text', text: p.text } : { type: 'image', source: { type: 'base64', media_type: 'image/png', data: p.image_url.url.replace(/^data:image\/\w+;base64,/, '') } })
+			: prompt;
+		return { model: config.model, max_tokens: 5000, messages: [{ role: 'user', content }] };
+	}
+	if (config.provider === 'gemini') {
+		const parts = isMultimodal
+			? prompt.map((p) => p.type === 'text' ? { text: p.text } : { inline_data: { mime_type: 'image/png', data: p.image_url.url.replace(/^data:image\/\w+;base64,/, '') } })
+			: [{ text: prompt }];
+		return { contents: [{ role: 'user', parts }], generationConfig: { maxOutputTokens: 5000 } };
+	}
+	const content = isMultimodal ? prompt : prompt;
+	return { model: config.model, messages: [{ role: 'system', content: 'Responda somente JSON válido.' }, { role: 'user', content }], temperature: 0.3 };
+}
+
+async function request(config: AIConfig, prompt: PromptContent) {
 	const response = await fetch(endpointFor(config, 'chat'), {
 		method: 'POST',
 		headers: { 'content-type': 'application/json', Accept: 'application/json', ...headers(config) },
@@ -97,6 +119,10 @@ export async function listModels(config: AIConfig) {
 	return ids.sort();
 }
 
-export async function generateProposal(config: AIConfig, prompt: string) {
+export async function generateProposal(config: AIConfig, prompt: PromptContent) {
 	return parseAIProposal(await request(config, prompt));
+}
+
+export function supportsVision(config: AIConfig): boolean {
+	return providerSupportsVision(config.provider);
 }

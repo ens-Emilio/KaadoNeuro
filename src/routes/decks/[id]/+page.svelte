@@ -8,11 +8,14 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { goto } from '$app/navigation';
-	import { ArrowLeft, Trash2, Plus, Upload, FileText, FileUp } from '@lucide/svelte';
+	import { ArrowLeft, Trash2, Plus, Upload, FileText, FileUp, Download } from '@lucide/svelte';
 	import { parseImport } from '$lib/import.js';
 	import { haptic } from '$lib/haptics.js';
 	import AIGenerateDialog from '$lib/components/ai/ai-generate-dialog.svelte';
+	import MarkdownRenderer from '$lib/components/markdown-renderer.svelte';
 	import * as m from '$lib/paraglide/messages.js';
+	import { buildDeckExport } from '$lib/deck-export.js';
+	import { exportToAnkiCsv, downloadAnkiCsv } from '$lib/anki-export.js';
 
 	const deckId = page.params.id ?? '';
 
@@ -21,9 +24,21 @@
 
 	let front = $state('');
 	let back = $state('');
+	let cardTags = $state<string[]>([]);
+	let newTag = $state('');
+	function addTag() {
+		const t = newTag.trim();
+		if (!t) return;
+		if (!cardTags.includes(t)) cardTags.push(t);
+		newTag = '';
+	}
+	function removeTag(tag: string) {
+		cardTags = cardTags.filter((x) => x !== tag);
+	}
 	let savedFlash = $state(false);
 	let deletingId: string | null = $state(null);
 	let deleteOpen = $state(false);
+	let editorMode = $state<'edit' | 'preview'>('edit');
 
 	let importOpen = $state(false);
 	let activeTab = $state('file');
@@ -49,11 +64,12 @@
 		const now = new Date().toISOString();
 		cards.update((all) => [
 			...all,
-			{ id: generateId(), deckId, front: front.trim(), back: back.trim(), interval: 0, repetitions: 0, easeFactor: 2.5, dueDate: now, createdAt: now }
+			{ id: generateId(), deckId, front: front.trim(), back: back.trim(), tags: [...cardTags], interval: 0, repetitions: 0, easeFactor: 2.5, dueDate: now, createdAt: now }
 		]);
 		haptic(10);
 		front = '';
 		back = '';
+		cardTags = [];
 	}
 
 	function deleteCard(id: string) {
@@ -96,6 +112,7 @@
 			deckId,
 			front: c.front,
 			back: c.back,
+			tags: [],
 			interval: 0,
 			repetitions: 0,
 			easeFactor: 2.5,
@@ -125,6 +142,27 @@
 		if (!importText.trim()) return;
 		runParse(importText);
 	}
+
+	function handleExport() {
+		if (!deck) return;
+		const bundle = buildDeckExport(deckId, $decks, $cards, generateId);
+		if (!bundle) return;
+		const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `${deck.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_deck.json`;
+		a.click();
+		URL.revokeObjectURL(url);
+		haptic(10);
+	}
+	function handleAnkiExport() {
+		if (!deck) return;
+		const csv = exportToAnkiCsv(deck, deckCards);
+		const filename = `${deck.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_anki.csv`;
+		downloadAnkiCsv(filename, csv);
+		haptic(10);
+	}
 </script>
 
 <div class="container mx-auto max-w-4xl space-y-6 p-5 sm:p-6">
@@ -143,6 +181,12 @@
 				<span class="font-mono text-[10px] font-bold tracking-[0.08em] uppercase text-accent">{m['deck.saved']()}</span>
 			{/if}
 		</div>
+		<Button variant="ghost" size="icon" onclick={handleExport} aria-label={m['deck.export']()}>
+			<Download class="size-[18px] [stroke-width:1.75]" />
+		</Button>
+		<Button variant="ghost" size="icon" onclick={handleAnkiExport} aria-label={m['anki.export']()}>
+			<FileText class="size-[18px] [stroke-width:1.75]" />
+		</Button>
 		<AIGenerateDialog deckId={deckId} deckName={deck?.name} />
 		<Dialog.Root bind:open={importOpen}>
 			<Dialog.Trigger>
@@ -284,13 +328,52 @@
 					<Card.Title class="text-sm">{m['deck.newCard']()}</Card.Title>
 				</Card.Header>
 				<Card.Content class="space-y-3">
-					<div class="space-y-1.5">
-						<Label>{m['deck.front']()}</Label>
-						<Textarea bind:value={front} placeholder={m['deck.frontPlaceholder']()} rows={3} />
+					<div class="flex items-center justify-between gap-2">
+						<div class="inline-flex rounded-md border bg-secondary/50 p-0.5">
+							<button type="button" onclick={() => (editorMode = 'edit')} class="rounded px-3 py-1 text-xs font-semibold transition-colors {editorMode === 'edit' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}">{m['editor.edit']()}</button>
+							<button type="button" onclick={() => (editorMode = 'preview')} class="rounded px-3 py-1 text-xs font-semibold transition-colors {editorMode === 'preview' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}">{m['editor.preview']()}</button>
+						</div>
+						<span class="text-[10px] text-muted-foreground">{m['editor.markdownHint']()}</span>
 					</div>
+					{#if editorMode === 'edit'}
+						<div class="space-y-1.5">
+							<Label>{m['deck.front']()}</Label>
+							<Textarea bind:value={front} placeholder={m['deck.frontPlaceholder']()} rows={3} />
+						</div>
+						<div class="space-y-1.5">
+							<Label>{m['deck.backField']()}</Label>
+							<Textarea bind:value={back} placeholder={m['deck.backPlaceholder']()} rows={4} />
+						</div>
+					{:else}
+						<div class="space-y-1.5">
+							<Label>{m['deck.front']()}</Label>
+							<div class="min-h-[72px] rounded-md border bg-card px-3 py-2"><MarkdownRenderer content={front} /></div>
+						</div>
+						<div class="space-y-1.5">
+							<Label>{m['deck.backField']()}</Label>
+							<div class="min-h-[96px] rounded-md border bg-card px-3 py-2"><MarkdownRenderer content={back} /></div>
+						</div>
+					{/if}
 					<div class="space-y-1.5">
-						<Label>{m['deck.backField']()}</Label>
-						<Textarea bind:value={back} placeholder={m['deck.backPlaceholder']()} rows={4} />
+						<Label>{m['tags.add']()}</Label>
+						<div class="flex gap-2">
+							<Input bind:value={newTag} placeholder={m['tags.placeholder']()} onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }} />
+							<Button variant="outline" size="icon" onclick={addTag} aria-label={m['tags.add']()}>
+								<Plus class="size-[18px] [stroke-width:1.75]" />
+							</Button>
+						</div>
+						{#if cardTags.length > 0}
+							<div class="flex flex-wrap gap-1.5 pt-1">
+								{#each cardTags as tag}
+									<span class="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
+										{tag}
+										<button type="button" onclick={() => removeTag(tag)} aria-label={m['tags.remove']({ tag })} class="ml-0.5 rounded-full p-0.5 hover:bg-background/50">
+											<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+										</button>
+									</span>
+								{/each}
+							</div>
+						{/if}
 					</div>
 					<Button onclick={addCard} class="w-full">
 						<Plus class="size-[18px] [stroke-width:1.75]" /> {m['deck.add']()}

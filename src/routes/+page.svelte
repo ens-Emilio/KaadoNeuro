@@ -1,12 +1,24 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
+	import { xp, level } from '$lib/gamification-store.js';
 	import { decks, cards, generateId, streak } from '$lib/stores.js';
 	import { goto } from '$app/navigation';
-	import { Plus, Play, Edit } from '@lucide/svelte';
+	import { Plus, Play, Edit, Upload } from '@lucide/svelte';
 	import { formatDateShort } from '$lib/import.js';
 	import { getLocale } from '$lib/paraglide/runtime.js';
 	import * as m from '$lib/paraglide/messages.js';
 	import AIGenerateDialog from '$lib/components/ai/ai-generate-dialog.svelte';
+	import { mergeDeckImport } from '$lib/deck-export.js';
+
+	// Onboarding automático: se não há decks, redireciona para o tutorial.
+	// Só roda no cliente após hidratação para evitar flash durante SSR.
+	let hasCheckedOnboarding = false;
+	$effect(() => {
+		if (!hasCheckedOnboarding && $decks.length === 0) {
+			hasCheckedOnboarding = true;
+			goto('/tutorial');
+		}
+	});
 
 	function createDeck() {
 		const id = generateId();
@@ -33,6 +45,26 @@
 			.filter((entry) => entry.due > 0)
 			.sort((a, b) => b.due - a.due)[0]
 	);
+
+	let importError = $state('');
+
+	async function handleImportDeck(e: Event) {
+		const target = e.target as HTMLInputElement;
+		const file = target.files?.[0];
+		if (!file) return;
+		importError = '';
+		try {
+			const text = await file.text();
+			const json = JSON.parse(text);
+			const result = mergeDeckImport(json, generateId);
+			decks.update((all) => [...all, result.deck]);
+			cards.update((all) => [...all, ...result.cards]);
+			goto(`/decks/${result.deck.id}`);
+		} catch {
+			importError = m['deck.importError']();
+		}
+		target.value = '';
+	}
 </script>
 
 <div class="min-h-screen bg-background pb-20">
@@ -52,6 +84,16 @@
 					<span class="font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground">{m['home.streak']()}</span>
 					<span class="font-mono text-xs font-semibold tabular-nums">{($streak ?? 0) === 1 ? m['home.streakDay']({ days: 1 }) : m['home.streakDays']({ days: $streak ?? 0 })}</span>
 				</div>
+			{#if $xp > 0}
+				<div
+					class="inline-flex items-center gap-2.5 border border-border bg-[var(--muted-surface)] px-3.5 py-2"
+					title={m['gamification.badge']({ level: $level, xp: $xp })}
+				>
+					<span class="size-2 rounded-full bg-[var(--accent-text)]" aria-hidden="true"></span>
+					<span class="font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground">{m['gamification.level']({ level: $level })}</span>
+					<span class="font-mono text-xs font-semibold tabular-nums">{m['gamification.xp']({ xp: $xp })}</span>
+				</div>
+			{/if}
 			</div>
 		</header>
 
@@ -77,6 +119,11 @@
 							{m['home.study']()}
 						</Button>
 						<span class="font-display text-sm italic text-muted-foreground">{m['home.upToDate']()}</span>
+					{/if}
+					{#if dueTotal > 0}
+						<Button href="/review/quick" variant="secondary" size="lg">
+							{m['quickReview.start']()}
+						</Button>
 					{/if}
 				</div>
 			</div>
@@ -109,6 +156,11 @@
 						{m['home.newDeck']()}
 					</Button>
 				</div>
+					<label class="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+						<Upload class="size-[18px] [stroke-width:1.75]" aria-hidden="true" />
+						{m['deck.importDeck']()}
+						<input type="file" accept=".json,application/json" class="hidden" onchange={handleImportDeck} />
+					</label>
 			</div>
 
 			{#if $decks.length === 0}
@@ -167,5 +219,8 @@
 				</div>
 			{/if}
 		</section>
+		{#if importError}
+			<p class="mt-4 text-center text-sm text-[var(--q-errei)]">{importError}</p>
+		{/if}
 	</div>
 </div>

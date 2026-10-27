@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { Sun, Moon } from '@lucide/svelte';
+	import { Sun, Moon, Monitor } from '@lucide/svelte';
 	import { getLocale, setLocale, locales } from '$lib/paraglide/runtime.js';
 	import { localeNames, rtlLocales } from '$lib/i18n/locales.js';
 	import * as m from '$lib/paraglide/messages.js';
+	import { themePreference, applyTheme, type ThemePreference } from '$lib/theme-store.js';
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import logoMark from '$lib/assets/logo-mark.svg';
@@ -23,16 +24,25 @@
 		return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
 	}
 
-	let theme: 'light' | 'dark' = $state('light');
 	let locale = $state(getLocale());
 
 	$effect(() => {
-		try {
-			const saved = localStorage.getItem('kaadoneuro_theme');
-			if (saved === 'dark' || saved === 'light') theme = saved;
-			else if (window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark';
-			document.documentElement.setAttribute('data-theme', theme);
-		} catch {}
+		const unsub = themePreference.subscribe((pref) => {
+			applyTheme(pref);
+		});
+		return unsub;
+	});
+
+	$effect(() => {
+		if (typeof window === 'undefined') return;
+		const mq = window.matchMedia('(prefers-color-scheme: dark)');
+		const handler = () => {
+			let current: ThemePreference = 'auto';
+			const unsub = themePreference.subscribe((v) => { current = v; unsub(); });
+			if (current === 'auto') applyTheme('auto');
+		};
+		mq.addEventListener('change', handler);
+		return () => mq.removeEventListener('change', handler);
 	});
 
 	$effect(() => {
@@ -41,10 +51,11 @@
 		document.documentElement.dir = rtlLocales[locale] ? 'rtl' : 'ltr';
 	});
 
-	function toggleTheme() {
-		theme = theme === 'dark' ? 'light' : 'dark';
-		document.documentElement.setAttribute('data-theme', theme);
-		try { localStorage.setItem('kaadoneuro_theme', theme); } catch {}
+	function cycleTheme() {
+		let current: ThemePreference = 'auto';
+		const unsub = themePreference.subscribe((v) => { current = v; unsub(); });
+		const next: ThemePreference = current === 'auto' ? 'light' : current === 'light' ? 'dark' : 'auto';
+		themePreference.set(next);
 	}
 
 	function changeLocale(e: Event) {
@@ -61,6 +72,9 @@
 <svelte:head>
 	<link rel="icon" href={favicon} />
 	<title>KaadoNeuro</title>
+	<script>
+		(function(){try{var t=JSON.parse(localStorage.getItem('kaadoneuro_theme')||'"auto"');if(t!=='auto'&&t!=='light'&&t!=='dark')t='auto';var r=t==='auto'?(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):t;document.documentElement.setAttribute('data-theme',r);}catch(e){}})();
+	</script>
 </svelte:head>
 
 <header class="sticky top-0 z-30 border-b border-border/70 bg-[color-mix(in_oklch,var(--bg)_92%,transparent)] backdrop-blur-[14px]">
@@ -99,17 +113,19 @@
 				{/each}
 			</select>
 			<button
-				onclick={toggleTheme}
+				onclick={cycleTheme}
 				class="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-semibold transition-colors hover:border-[var(--border-strong)]"
-				aria-label={theme === 'dark' ? m['theme.toLight']() : m['theme.toDark']()}
-				aria-pressed={theme === 'dark'}
+				aria-label={m['theme.label']()}
 			>
-				{#if theme === 'dark'}
+				{#if $themePreference === 'dark'}
 					<Moon class="size-3.5" aria-hidden="true" />
 					{m['theme.dark']()}
-				{:else}
+				{:else if $themePreference === 'light'}
 					<Sun class="size-3.5" aria-hidden="true" />
 					{m['theme.light']()}
+				{:else}
+					<Monitor class="size-3.5" aria-hidden="true" />
+					{m['theme.auto']()}
 				{/if}
 			</button>
 		</div>
