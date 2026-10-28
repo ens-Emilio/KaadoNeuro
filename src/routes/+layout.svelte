@@ -52,9 +52,7 @@
 	});
 
 	function cycleTheme() {
-		let current: ThemePreference = 'auto';
-		const unsub = themePreference.subscribe((v) => { current = v; unsub(); });
-		const next: ThemePreference = current === 'auto' ? 'light' : current === 'light' ? 'dark' : 'auto';
+		const next: ThemePreference = $themePreference === 'auto' ? 'light' : $themePreference === 'light' ? 'dark' : 'auto';
 		themePreference.set(next);
 		applyTheme(next);
 	}
