@@ -266,5 +266,7 @@
   "sync.noRemote": "Không tìm thấy bản sao lưu từ xa.",
   "sync.corsHint": "Lỗi CORS: máy chủ WebDAV có thể chặn yêu cầu từ trình duyệt. Sử dụng proxy CORS hoặc công cụ đồng bộ trên máy tính.",
   "sync.actions": "Thao tác đồng bộ",
-  "sync.pageTitle": "KaadoNeuro · Đồng bộ từ xa"
+  "sync.pageTitle": "KaadoNeuro · Đồng bộ từ xa",
+  "theme.auto": "Tự động",
+  "theme.label": "Giao diện"
 }

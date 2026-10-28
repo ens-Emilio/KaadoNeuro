@@ -266,5 +266,7 @@
   "sync.noRemote": "Uzak yedek bulunamadı.",
   "sync.corsHint": "CORS hatası: WebDAV sunucunuz tarayıcı isteklerini engelliyor olabilir. Bir CORS proxy veya masaüstü senkronizasyon aracı kullanın.",
   "sync.actions": "Senkronizasyon işlemleri",
-  "sync.pageTitle": "KaadoNeuro · Uzaktan Senkronizasyon"
+  "sync.pageTitle": "KaadoNeuro · Uzaktan Senkronizasyon",
+  "theme.auto": "Otomatik",
+  "theme.label": "Tema"
 }

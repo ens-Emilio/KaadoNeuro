@@ -265,5 +265,8 @@
   "sync.noRemote": "No se encontró copia remota.",
   "sync.corsHint": "Error CORS: tu servidor WebDAV puede bloquear peticiones del navegador. Usa un proxy CORS o una herramienta de sincronización local.",
   "sync.actions": "Acciones de sincronización",
-  "sync.pageTitle": "KaadoNeuro · Sincronización remota"
+  "sync.pageTitle": "KaadoNeuro · Sincronización remota",
+  "editor.edit": "Editar",
+  "editor.markdownHint": "Markdown compatible",
+  "editor.preview": "Vista previa"
 }

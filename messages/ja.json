@@ -266,5 +266,7 @@
   "sync.noRemote": "リモートバックアップが見つかりません。",
   "sync.corsHint": "CORSエラー：WebDAVサーバーがブラウザリクエストをブロックしている可能性があります。CORSプロキシまたはデスクトップ同期ツールを使用してください。",
   "sync.actions": "同期アクション",
-  "sync.pageTitle": "KaadoNeuro · リモート同期"
+  "sync.pageTitle": "KaadoNeuro · リモート同期",
+  "theme.auto": "自動",
+  "theme.label": "テーマ"
 }

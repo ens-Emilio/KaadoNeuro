@@ -235,7 +235,7 @@
   "pomodoro.start": "开始专注",
   "pomodoro.pause": "暂停",
   "pomodoro.reset": "重置",
-	"pomodoro.cycle": "周期 {current}/4",
+  "pomodoro.cycle": "周期 {current}/4",
   "gamification.xp": "{xp} XP",
   "gamification.level": "等级 {level}",
   "gamification.badge": "等级 {level} · {xp} XP",
@@ -266,5 +266,7 @@
   "sync.noRemote": "未找到远程备份。",
   "sync.corsHint": "CORS 错误：您的 WebDAV 服务器可能阻止浏览器请求。请使用 CORS 代理或桌面同步工具。",
   "sync.actions": "同步操作",
-  "sync.pageTitle": "KaadoNeuro · 远程同步"
+  "sync.pageTitle": "KaadoNeuro · 远程同步",
+  "theme.auto": "自动",
+  "theme.label": "主题"
 }
