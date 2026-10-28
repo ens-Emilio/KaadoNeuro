@@ -8,3 +8,10 @@ bun.lockb
 # Miscellaneous
 /static/
 /drizzle/
+
+# Generated at build time
+/src/lib/paraglide/
+/src/paraglide/
+/.svelte-kit/
+/build/
+/test-results/

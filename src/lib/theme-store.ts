@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import { z } from 'zod';
 
 export type ThemePreference = 'auto' | 'light' | 'dark';
@@ -32,12 +32,27 @@ function saveTheme(value: ThemePreference) {
 	if (typeof window === 'undefined') return;
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
-	} catch {}
+	} catch {
+		// Storage may be unavailable (private mode or quota); theme remains in memory.
+	}
 }
 
 export const themePreference = writable<ThemePreference>(loadTheme());
 
-// Subscribe to persist changes to localStorage
 if (typeof window !== 'undefined') {
+	// Persist local changes. `storage` events do not fire in the originating tab,
+	// so this cannot loop back into `themePreference`.
 	themePreference.subscribe(saveTheme);
+
+	// Another tab changed the preference: mirror it here.
+	window.addEventListener('storage', (event) => {
+		if (event.key !== STORAGE_KEY) return;
+		const result = themeSchema.safeParse(JSON.parse(event.newValue ?? '"auto"'));
+		themePreference.set(result.success ? result.data : 'auto');
+	});
+
+	// In 'auto' mode the resolved theme must follow the OS setting live.
+	window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+		if (get(themePreference) === 'auto') applyTheme('auto');
+	});
 }

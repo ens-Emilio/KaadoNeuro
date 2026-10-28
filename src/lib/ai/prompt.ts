@@ -1,9 +1,13 @@
 import { AIProposalSchema } from './schemas.js';
-import type { AICardProposal, AIGenerationInput, AIProposal, AIProvider } from './types.js';
+import type { AICardProposal, AIGenerationInput, AIProposal } from './types.js';
 
 const MAX_SOURCE_LENGTH = 12000;
 
-export function buildGenerationPrompt(input: AIGenerationInput): string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> {
+export function buildGenerationPrompt(
+	input: AIGenerationInput
+):
+	| string
+	| Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> {
 	const kindLabel = input.kind === 'deck' ? 'baralho completo' : 'lote de cartões';
 	const textPrompt = `Você gera material de revisão para um app de flashcards.
 Tarefa: criar ${kindLabel}.
@@ -39,7 +43,8 @@ export function parseAIProposal(raw: string): AIProposal {
 	const trimmed = raw.trim();
 	const start = trimmed.indexOf('{');
 	const end = trimmed.lastIndexOf('}');
-	if (start === -1 || end === -1 || end <= start) throw new Error('Resposta da IA não contém JSON válido.');
+	if (start === -1 || end === -1 || end <= start)
+		throw new Error('Resposta da IA não contém JSON válido.');
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(trimmed.slice(start, end + 1));

@@ -1,35 +1,40 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-@import "tw-animate-css";
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *, [data-theme="dark"] *));
 
 :root {
-	--bg: #F2EFE9;
-	--surface: #FBF9F5;
-	--fg: #18181B;
-	--muted-surface: #E6E1D8;
-	--muted: #64635E;
-	--hairline: #DBD5C9;
-	--border: #DBD5C9;
-	--border-semantic: #9E988E;
-	--border-strong: #7D786F;
-	--accent-solid: #9E4733;
-	--accent-text: #9E4733;
+	--bg: #f2efe9;
+	--surface: #fbf9f5;
+	--fg: #18181b;
+	--muted-surface: #e6e1d8;
+	--muted: #64635e;
+	--hairline: #dbd5c9;
+	--border: #dbd5c9;
+	--border-semantic: #9e988e;
+	--border-strong: #7d786f;
+	--accent-solid: #9e4733;
+	--accent-text: #9e4733;
 	--accent-hover: #823827;
 	--accent-soft: color-mix(in oklch, var(--accent-solid) 10%, transparent);
 	--fg-soft: color-mix(in oklch, var(--fg) 5%, transparent);
-	--font-display: "Instrument Serif", Georgia, serif;
+	--font-display: 'Instrument Serif', Georgia, serif;
 	--font-body: Inter, system-ui, -apple-system, sans-serif;
-	--font-mono: "JetBrains Mono", ui-monospace, monospace;
+	--font-mono: 'JetBrains Mono', ui-monospace, monospace;
 	--radius: 14px;
 	--radius-lg: 18px;
 	--radius-xl: 22px;
-	--destructive-solid: #A62639;
-	--q-errei: #A62639;
-	--q-dificil: #99621E;
-	--q-bom: #2D6150;
-	--q-facil: #3B5978;
+	--destructive-solid: #a62639;
+	--q-errei: #a62639;
+	--q-dificil: #8a5718;
+	--q-bom: #2d6150;
+	--q-facil: #3b5978;
+	--heatmap-0: color-mix(in oklch, var(--muted-surface) 40%, transparent);
+	--heatmap-1: color-mix(in oklch, var(--accent-text) 25%, transparent);
+	--heatmap-2: color-mix(in oklch, var(--accent-text) 50%, transparent);
+	--heatmap-3: color-mix(in oklch, var(--accent-text) 75%, transparent);
+	--heatmap-4: var(--accent-text);
 	--ease-snappy: cubic-bezier(0.32, 0.72, 0, 1);
 	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 	--ease-in: cubic-bezier(0.55, 0, 1, 0.45);
@@ -44,7 +49,7 @@
 	--secondary: var(--bg);
 	--secondary-foreground: var(--fg);
 	--accent: var(--accent-text);
-	--accent-foreground: #FFFFFF;
+	--accent-foreground: #ffffff;
 	--destructive: var(--destructive-solid);
 	--destructive-foreground: #fff;
 	--input: var(--border-strong);
@@ -65,24 +70,29 @@
 }
 
 .dark,
-[data-theme="dark"] {
+[data-theme='dark'] {
 	--bg: #121316;
-	--surface: #1A1C20;
-	--fg: #EAE9E4;
-	--muted-surface: #24272D;
-	--muted: #9899A0;
-	--hairline: #2E3138;
-	--border: #2E3138;
+	--surface: #1a1c20;
+	--fg: #eae9e4;
+	--muted-surface: #24272d;
+	--muted: #9899a0;
+	--hairline: #2e3138;
+	--border: #2e3138;
 	--border-semantic: #525661;
 	--border-strong: #737885;
-	--accent-solid: #9E4733;
-	--accent-text: #E29583;
-	--accent-hover: #B5543E;
+	--accent-solid: #9e4733;
+	--accent-text: #e29583;
+	--accent-hover: #b5543e;
 	--accent-soft: color-mix(in oklch, var(--accent-solid) 22%, transparent);
-	--q-errei: #E87A8A;
-	--q-dificil: #E5AF67;
-	--q-bom: #E29583;
-	--q-facil: #8FB1D6;
+	--q-errei: #e87a8a;
+	--q-dificil: #e5af67;
+	--q-bom: #e29583;
+	--q-facil: #8fb1d6;
+	--heatmap-0: color-mix(in oklch, var(--muted-surface) 40%, transparent);
+	--heatmap-1: color-mix(in oklch, var(--accent-text) 20%, transparent);
+	--heatmap-2: color-mix(in oklch, var(--accent-text) 40%, transparent);
+	--heatmap-3: color-mix(in oklch, var(--accent-text) 65%, transparent);
+	--heatmap-4: var(--accent-text);
 	--card-foreground: var(--fg);
 	--popover: var(--surface);
 	--popover-foreground: var(--fg);
@@ -91,7 +101,7 @@
 	--secondary: var(--muted-surface);
 	--secondary-foreground: var(--fg);
 	--accent: var(--accent-text);
-	--accent-foreground: #18181B;
+	--accent-foreground: #18181b;
 	--destructive: var(--destructive-solid);
 	--destructive-foreground: #fff;
 	--input: var(--border-strong);
@@ -156,7 +166,7 @@
 		scroll-behavior: smooth;
 		color-scheme: light;
 	}
-	html[data-theme="dark"] {
+	html[data-theme='dark'] {
 		color-scheme: dark;
 	}
 	body {
@@ -169,7 +179,7 @@
 			color 300ms var(--ease-out);
 	}
 	body::before {
-		content: "";
+		content: '';
 		position: fixed;
 		inset: 0;
 		pointer-events: none;
@@ -195,6 +205,61 @@
 	text-transform: uppercase;
 	color: var(--accent-text);
 	font-weight: 700;
+}
+
+/* Review rating buttons. Hover tints the surface instead of filling it with the
+   quality color: those tokens are light in dark mode, so a white label on them
+   would fall below 4.5:1. A colored label on a 12% tint stays legible in both themes. */
+.rating-btn {
+	border-color: var(--border);
+	color: var(--rating-color);
+}
+.rating-btn:hover {
+	border-color: var(--rating-color);
+	background-color: color-mix(in oklch, var(--rating-color) 12%, var(--surface));
+}
+
+@keyframes shake {
+	0%,
+	100% {
+		transform: translateX(0) rotateY(180deg);
+	}
+	20% {
+		transform: translateX(-5px) rotateY(180deg);
+	}
+	40% {
+		transform: translateX(5px) rotateY(180deg);
+	}
+	60% {
+		transform: translateX(-3px) rotateY(180deg);
+	}
+	80% {
+		transform: translateX(3px) rotateY(180deg);
+	}
+}
+@keyframes stampFall {
+	0% {
+		opacity: 0;
+		transform: scale(1.4) rotate(-8deg);
+	}
+	60% {
+		opacity: 1;
+		transform: scale(0.98) rotate(-3deg);
+	}
+	100% {
+		opacity: 1;
+		transform: scale(1) rotate(-3deg);
+	}
+}
+@keyframes riseFade {
+	from {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	to {
+		opacity: 0.98;
+		transform: translateY(-10px);
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {

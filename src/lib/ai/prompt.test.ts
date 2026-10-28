@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { parseAIProposal, buildGenerationPrompt, truncateSource, cardSignature } from '$lib/ai/prompt.js';
+import {
+	parseAIProposal,
+	buildGenerationPrompt,
+	truncateSource,
+	cardSignature
+} from '$lib/ai/prompt.js';
 import { AIConfigSchema, AIGenerationRequestSchema, AIProposalSchema } from '$lib/ai/schemas.js';
 
 describe('parseAIProposal', () => {
@@ -51,7 +56,12 @@ describe('parseAIProposal', () => {
 
 describe('buildGenerationPrompt', () => {
 	it('includes kind, source, count and deckName', () => {
-		const prompt = buildGenerationPrompt({ kind: 'deck', source: 'Biologia', count: 20, deckName: 'Bio' });
+		const prompt = buildGenerationPrompt({
+			kind: 'deck',
+			source: 'Biologia',
+			count: 20,
+			deckName: 'Bio'
+		});
 		expect(prompt).toContain('baralho completo');
 		expect(prompt).toContain('Biologia');
 		expect(prompt).toContain('20');
@@ -80,12 +90,20 @@ describe('cardSignature', () => {
 
 describe('AIConfigSchema', () => {
 	it('accepts valid config', () => {
-		const result = AIConfigSchema.safeParse({ provider: 'anthropic', model: 'claude-haiku-4-5', apiKey: 'sk-test' });
+		const result = AIConfigSchema.safeParse({
+			provider: 'anthropic',
+			model: 'claude-haiku-4-5',
+			apiKey: 'sk-test'
+		});
 		expect(result.success).toBe(true);
 	});
 
 	it('rejects missing apiKey', () => {
-		const result = AIConfigSchema.safeParse({ provider: 'openai', model: 'gpt-4o-mini', apiKey: '' });
+		const result = AIConfigSchema.safeParse({
+			provider: 'openai',
+			model: 'gpt-4o-mini',
+			apiKey: ''
+		});
 		expect(result.success).toBe(false);
 	});
 

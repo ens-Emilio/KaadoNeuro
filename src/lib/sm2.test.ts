@@ -14,7 +14,7 @@ function makeCard(overrides: Partial<Flashcard> = {}): Flashcard {
 		createdAt: new Date().toISOString(),
 		deckId: 'd1',
 		tags: [],
-		...overrides,
+		...overrides
 	};
 }
 

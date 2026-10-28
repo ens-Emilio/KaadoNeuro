@@ -1,19 +1,22 @@
 # Hospedagem
 
-O KaadoNeuro é um site estático e local-first. Não exige servidor de aplicação nem banco de dados remoto.
+O KaadoNeuro é um site estático e local-first. Não exige servidor de aplicação, banco remoto nem conta de usuário.
 
 ## Rodar no PC do usuário
 
+Requisitos: Node.js 22.12 ou superior e pnpm 10.
+
 ```bash
-npm ci
-npm run dev
+corepack enable
+pnpm install
+pnpm dev
 ```
 
-Para gerar a versão instalável:
+Para gerar a versão de produção:
 
 ```bash
-npm run build
-npm run preview
+pnpm build
+pnpm preview
 ```
 
 ## Hospedar
@@ -28,13 +31,29 @@ Publique o conteúdo da pasta `build` em qualquer host estático com HTTPS, por 
 
 Configuração de build em todos os casos:
 
-- comando: `npm run build`
+- comando: `pnpm build`
 - diretório publicado: `build`
 - fallback/SPA: `index.html`
 
+### Tipos MIME
+
+Sirva `.wasm` como `application/wasm`. O importador de pacotes Anki compila SQLite em WebAssembly; um MIME errado faz o navegador recusar o módulo.
+
+### CSP
+
+O app já sai com a política em `<meta>` (ver `SECURITY.md`), então funciona sem configuração extra. Se preferir enviá-la como header, remova a `<meta>` de `build/index.html` no deploy e configure no servidor:
+
+```nginx
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; img-src 'self' data: blob:; frame-ancestors 'none'" always;
+add_header X-Frame-Options "DENY" always;
+add_header X-Content-Type-Options "nosniff" always;
+```
+
+`frame-ancestors` só tem efeito como header.
+
 ## Atualizações
 
-O service worker mantém os arquivos em cache. Após publicar uma nova versão, o usuário recebe a atualização na próxima visita.
+O service worker mantém o app shell em cache. Após publicar uma nova versão, o usuário recebe a atualização na próxima visita.
 
 ## IA
 
@@ -47,5 +66,5 @@ A página **Tutorial** explica o formato de importação. O backup completo est�
 ## Limites do modelo
 
 - Os dados pertencem ao navegador do usuário; limpar os dados do site apaga o conteúdo.
-- Não há sincronização entre dispositivos.
-- Para transferir dados, use o backup em JSON.
+- Não há sincronização entre dispositivos nem backend de conta.
+- Para transferir dados, use o backup em JSON ou o link de compartilhamento de um baralho.

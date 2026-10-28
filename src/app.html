@@ -4,7 +4,14 @@
 	<head>
 		<meta charset="utf-8" />
 
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<!-- The static build has no server, so hooks.server.ts cannot set headers.
+		     Keep this in sync with that policy; 'wasm-unsafe-eval' is what sql.js
+		     needs to read .apkg collections. frame-ancestors is header-only and
+		     therefore omitted here. -->
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; img-src 'self' data: blob:"
+		/>
 
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

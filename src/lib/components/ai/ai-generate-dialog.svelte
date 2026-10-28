@@ -5,11 +5,10 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { cards, decks, generateId } from '$lib/stores.js';
-	import { aiConfig, normalizeAIConfig } from '$lib/ai/store.js';
+	import { aiConfig, withAIConfig } from '$lib/ai/store.js';
 	import { AI_CARD_COUNTS, type AICardProposal, type AIProposal } from '$lib/ai/types.js';
 	import { NotebookPen, Loader2, Check, X, Image as ImageIcon } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
-	import AIGenerateTrigger from './ai-generate-trigger.svelte';
 	import * as m from '$lib/paraglide/messages.js';
 	import { generateProposal, supportsVision } from '$lib/ai/client.js';
 	import { buildGenerationPrompt } from '$lib/ai/prompt.js';
@@ -20,9 +19,9 @@
 		onApplied?: () => void;
 	};
 
-	let { deckId, deckName, onApplied }: Props = $props();
+	let { deckId, deckName }: Props = $props();
 
-	let open = $state(false);
+	let open = $state(true);
 	let generating = $state(false);
 	let error = $state('');
 	let proposal: AIProposal | null = $state(null);
@@ -32,8 +31,11 @@
 	let count = $state(AI_CARD_COUNTS[0]);
 	let imageBase64 = $state<string | undefined>(undefined);
 	const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
-	const config = $derived(normalizeAIConfig($aiConfig));
-	const hasVision = $derived(config ? supportsVision(config) : false);
+	const hasStoredConfig = $derived(Boolean($aiConfig));
+	const hasVision = $derived(
+		hasStoredConfig &&
+			supportsVision({ provider: $aiConfig!.provider, model: $aiConfig!.model, apiKey: '' })
+	);
 
 	function handleImageSelect(event: Event) {
 		const input = event.target as HTMLInputElement;
@@ -57,19 +59,22 @@
 	}
 
 	async function generate() {
-		if (!config || !source.trim()) return;
+		if (!source.trim() || !$aiConfig) return;
 		generating = true;
 		error = '';
 		try {
-			const generated = await generateProposal(
-				config,
-				buildGenerationPrompt({
-					kind: deckId ? 'cards' : 'deck',
-					source: source.trim(),
-					count,
-					deckName: deckId ? deckName : undefined,
-					imageBase64
-				})
+			const stored = $aiConfig;
+			const generated = await withAIConfig(stored, (runtimeConfig) =>
+				generateProposal(
+					runtimeConfig,
+					buildGenerationPrompt({
+						kind: deckId ? 'cards' : 'deck',
+						source: source.trim(),
+						count,
+						deckName: deckId ? deckName : undefined,
+						imageBase64
+					})
+				)
 			);
 			proposal = generated;
 			editedCards = [...generated.cards];
@@ -86,7 +91,10 @@
 		const now = new Date().toISOString();
 		const targetDeckId = deckId ?? generateId();
 		if (!deckId) {
-			decks.update((all) => [...all, { id: targetDeckId, name: editedDeckName.trim() || 'Baralho gerado', createdAt: now }]);
+			decks.update((all) => [
+				...all,
+				{ id: targetDeckId, name: editedDeckName.trim() || 'Baralho gerado', createdAt: now }
+			]);
 		}
 		const toAdd = editedCards.map((c) => ({
 			id: generateId(),
@@ -121,8 +129,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<AIGenerateTrigger />
-	<Dialog.Content class="sm:max-w-[640px] max-h-[85vh] overflow-y-auto">
+	<Dialog.Content class="max-h-[85vh] overflow-y-auto sm:max-w-[640px]">
 		<Dialog.Header>
 			<Dialog.Title>{m['aiGen.title']()}</Dialog.Title>
 			<Dialog.Description>
@@ -134,19 +141,33 @@
 			</Dialog.Description>
 		</Dialog.Header>
 
-		{#if !config}
-			<div class="rounded-lg border border-[var(--q-dificil)]/30 bg-[color-mix(in_oklch,var(--q-dificil)_8%,transparent)] p-4">
-				<p class="text-sm text-[var(--q-dificil)]">{m['aiGen.noConfig']()} <a href="/settings/ai" class="font-semibold underline">{m['nav.ai']()}</a>.</p>
+		{#if !hasStoredConfig}
+			<div
+				class="rounded-lg border border-[var(--q-dificil)]/30 bg-[color-mix(in_oklch,var(--q-dificil)_8%,transparent)] p-4"
+			>
+				<p class="text-sm text-[var(--q-dificil)]">
+					{m['aiGen.noConfig']()}
+					<a href="/settings/ai" class="font-semibold underline">{m['nav.ai']()}</a>.
+				</p>
 			</div>
 		{:else if !proposal}
 			<div class="space-y-4">
 				<div class="space-y-1.5">
 					<Label for="ai-source">{m['aiGen.source']()}</Label>
-					<Textarea id="ai-source" bind:value={source} placeholder={m['aiGen.sourcePlaceholder']()} rows={4} />
+					<Textarea
+						id="ai-source"
+						bind:value={source}
+						placeholder={m['aiGen.sourcePlaceholder']()}
+						rows={4}
+					/>
 				</div>
 				<div class="space-y-1.5">
 					<Label for="ai-count">{m['aiGen.count']()}</Label>
-					<select id="ai-count" class="flex h-9 w-full rounded-md border border-input bg-card px-3 text-sm" bind:value={count}>
+					<select
+						id="ai-count"
+						class="flex h-9 w-full rounded-md border border-input bg-card px-3 text-sm"
+						bind:value={count}
+					>
 						{#each AI_CARD_COUNTS as n}
 							<option value={n}>{m['aiGen.countN']({ count: n })}</option>
 						{/each}
@@ -156,13 +177,23 @@
 					<Label>{m['ai.uploadImage']()}</Label>
 					{#if imageBase64}
 						<div class="relative inline-block">
-							<img src={imageBase64} alt={m['ai.imagePreview']()} class="h-24 w-24 rounded-md border border-border object-cover" />
-							<button onclick={removeImage} class="absolute -right-2 -top-2 rounded-full bg-destructive p-0.5 text-destructive-foreground shadow-sm hover:bg-destructive/90" aria-label={m['ai.removeImage']()}>
+							<img
+								src={imageBase64}
+								alt={m['ai.imagePreview']()}
+								class="h-24 w-24 rounded-md border border-border object-cover"
+							/>
+							<button
+								onclick={removeImage}
+								class="text-destructive-foreground absolute -top-2 -right-2 rounded-full bg-destructive p-0.5 shadow-sm hover:bg-destructive/90"
+								aria-label={m['ai.removeImage']()}
+							>
 								<X class="size-3.5" />
 							</button>
 						</div>
 					{:else}
-						<label class="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm hover:bg-muted/50">
+						<label
+							class="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm hover:bg-muted/50"
+						>
 							<ImageIcon class="size-4 text-muted-foreground" />
 							<span>{m['ai.uploadImage']()}</span>
 							<input type="file" accept="image/*" class="hidden" onchange={handleImageSelect} />
@@ -174,7 +205,11 @@
 					{/if}
 				</div>
 				{#if error}
-					<p class="rounded-md border border-[var(--q-errei)]/30 bg-[color-mix(in_oklch,var(--q-errei)_8%,transparent)] px-3 py-2 text-xs text-[var(--q-errei)]">{error}</p>
+					<p
+						class="rounded-md border border-[var(--q-errei)]/30 bg-[color-mix(in_oklch,var(--q-errei)_8%,transparent)] px-3 py-2 text-xs text-[var(--q-errei)]"
+					>
+						{error}
+					</p>
 				{/if}
 				<Button onclick={generate} disabled={generating || !source.trim()} class="w-full">
 					{#if generating}
@@ -193,12 +228,16 @@
 					<Input id="ai-deck-name" bind:value={editedDeckName} />
 				</div>
 				<p class="text-xs text-muted-foreground">{proposal.summary}</p>
-				<div class="space-y-2 max-h-[320px] overflow-y-auto">
-					{#each editedCards as card, i}
-						<div class="rounded-md border border-border bg-card p-3 space-y-2">
+				<div class="max-h-[320px] space-y-2 overflow-y-auto">
+					{#each editedCards, i}
+						<div class="space-y-2 rounded-md border border-border bg-card p-3">
 							<div class="flex items-start justify-between gap-2">
 								<span class="font-mono text-[10px] text-muted-foreground">#{i + 1}</span>
-								<button onclick={() => removeCard(i)} class="text-muted-foreground hover:text-[var(--q-errei)]" aria-label={m['aiGen.removeCard']()}>
+								<button
+									onclick={() => removeCard(i)}
+									class="text-muted-foreground hover:text-[var(--q-errei)]"
+									aria-label={m['aiGen.removeCard']()}
+								>
 									<X class="size-3.5" />
 								</button>
 							</div>
@@ -207,14 +246,16 @@
 						</div>
 					{/each}
 				</div>
-				<div class="flex items-center justify-between gap-2 pt-2 border-t border-border">
+				<div class="flex items-center justify-between gap-2 border-t border-border pt-2">
 					<Button variant="ghost" onclick={discard}>
 						<X class="size-[18px] [stroke-width:1.75]" aria-hidden="true" />
 						{m['aiGen.discard']()}
 					</Button>
 					<Button onclick={applyProposal} disabled={editedCards.length === 0}>
 						<Check class="size-[18px] [stroke-width:1.75]" aria-hidden="true" />
-{editedCards.length === 1 ? m['aiGen.apply.one']({ count: 1 }) : m['aiGen.apply']({ count: editedCards.length })}
+						{editedCards.length === 1
+							? m['aiGen.apply.one']({ count: 1 })
+							: m['aiGen.apply']({ count: editedCards.length })}
 					</Button>
 				</div>
 			</div>

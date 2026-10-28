@@ -3,78 +3,92 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import * as Card from '$lib/components/ui/card';
-	import { webdavConfig, isConfigured } from '$lib/sync-store.js';
+	import {
+		webdavConfig,
+		isConfigured,
+		needsPasswordMigration,
+		saveWebDavSecret,
+		withWebDavPassword
+	} from '$lib/sync-store.js';
+	import { vaultState } from '$lib/secret-vault.js';
+	import VaultGate from '$lib/components/vault-gate.svelte';
 	import { testConnection, uploadSnapshot, downloadSnapshot } from '$lib/sync-webdav.js';
 	import { buildSnapshot, applySnapshot } from '$lib/backup.js';
-	import { CloudUpload, CloudDownload, RefreshCw, AlertTriangle, CheckCircle2, XCircle } from '@lucide/svelte';
+	import { CloudUpload, CloudDownload } from '@lucide/svelte';
 	import * as m from '$lib/paraglide/messages.js';
 
 	let url = $state($webdavConfig?.url ?? '');
 	let username = $state($webdavConfig?.username ?? '');
-	let password = $state($webdavConfig?.password ?? '');
+	let password = $state('');
 	let autoSync = $state($webdavConfig?.autoSync ?? false);
-
 	let testStatus = $state<'idle' | 'testing' | 'success' | 'error'>('idle');
 	let testMessage = $state('');
-	let syncStatus = $state<'idle' | 'uploading' | 'downloading' | 'success' | 'error' | 'conflict'>('idle');
+	let syncStatus = $state<'idle' | 'uploading' | 'downloading' | 'success' | 'error' | 'conflict'>(
+		'idle'
+	);
 	let syncMessage = $state('');
 
-	function saveConfig() {
-		webdavConfig.set({
-			url,
-			username,
-			password,
-			autoSync,
-			lastSyncAt: $webdavConfig?.lastSyncAt
-		});
+	$effect(() => {
+		const stored = $webdavConfig;
+		if (!stored) return;
+		url = stored.url;
+		username = stored.username;
+		autoSync = stored.autoSync;
+	});
+
+	async function saveConfig(lastSyncAt = $webdavConfig?.lastSyncAt) {
+		const encrypted = password ? await saveWebDavSecret(password) : ($webdavConfig?.password ?? '');
+		webdavConfig.set({ url, username, password: encrypted, autoSync, lastSyncAt });
+		password = '';
 	}
 
 	async function handleTest() {
-		if (!url || !username || !password) {
+		if (!url || !username || !(password || $webdavConfig?.password)) {
 			testStatus = 'error';
 			testMessage = m['sync.testFail']();
 			return;
 		}
+		await saveConfig();
+		const stored = $webdavConfig;
+		if (!isConfigured(stored)) return;
 		testStatus = 'testing';
-		testMessage = '';
-		const result = await testConnection(url, username, password);
-		if (result.ok) {
-			testStatus = 'success';
-			testMessage = m['sync.testSuccess']();
-			saveConfig();
-		} else {
-			testStatus = 'error';
-			testMessage = result.cors ? m['sync.corsHint']() : (result.error ?? m['sync.testFail']());
-		}
+		const result = await withWebDavPassword(stored, (secret) =>
+			testConnection(stored.url, stored.username, secret)
+		);
+		testStatus = result.ok ? 'success' : 'error';
+		testMessage = result.ok
+			? m['sync.testSuccess']()
+			: result.cors
+				? m['sync.corsHint']()
+				: (result.error ?? m['sync.testFail']());
 	}
 
 	async function handleUpload() {
-		if (!isConfigured({ url, username, password, autoSync })) return;
+		await saveConfig();
+		const stored = $webdavConfig;
+		if (!isConfigured(stored)) return;
 		syncStatus = 'uploading';
-		syncMessage = '';
 		const snapshot = buildSnapshot();
-		const result = await uploadSnapshot(url, username, password, snapshot);
-		if (result.ok) {
-			syncStatus = 'success';
-			syncMessage = m['sync.uploadSuccess']();
-			webdavConfig.set({
-				url,
-				username,
-				password,
-				autoSync,
-				lastSyncAt: new Date().toISOString()
-			});
-		} else {
-			syncStatus = 'error';
-			syncMessage = result.cors ? m['sync.corsHint']() : (result.error ?? m['sync.testFail']());
-		}
+		const result = await withWebDavPassword(stored, (secret) =>
+			uploadSnapshot(stored.url, stored.username, secret, snapshot)
+		);
+		syncStatus = result.ok ? 'success' : 'error';
+		syncMessage = result.ok
+			? m['sync.uploadSuccess']()
+			: result.cors
+				? m['sync.corsHint']()
+				: (result.error ?? m['sync.testFail']());
+		if (result.ok) await saveConfig(new Date().toISOString());
 	}
 
-	async function handleDownload() {
-		if (!isConfigured({ url, username, password, autoSync })) return;
+	async function handleDownload(force = false) {
+		await saveConfig();
+		const stored = $webdavConfig;
+		if (!isConfigured(stored)) return;
 		syncStatus = 'downloading';
-		syncMessage = '';
-		const result = await downloadSnapshot(url, username, password);
+		const result = await withWebDavPassword(stored, (secret) =>
+			downloadSnapshot(stored.url, stored.username, secret)
+		);
 		if (!result.ok) {
 			syncStatus = 'error';
 			syncMessage = result.cors ? m['sync.corsHint']() : (result.error ?? m['sync.testFail']());
@@ -85,147 +99,104 @@
 			syncMessage = m['sync.noRemote']();
 			return;
 		}
-
-		// Merge strategy: compare timestamps, newer wins
 		const localTs = $webdavConfig?.lastSyncAt ? new Date($webdavConfig.lastSyncAt).getTime() : 0;
-		const remoteTs = result.snapshot.exportedAt ? new Date(result.snapshot.exportedAt).getTime() : 0;
-
-		if (remoteTs > localTs) {
-			applySnapshot(result.snapshot);
-			syncStatus = 'success';
-			syncMessage = m['sync.downloadSuccess']();
-			webdavConfig.set({
-				url,
-				username,
-				password,
-				autoSync,
-				lastSyncAt: new Date().toISOString()
-			});
-		} else if (localTs > remoteTs) {
+		const remoteTs = new Date(result.snapshot.exportedAt).getTime();
+		if (!force && localTs > remoteTs) {
 			syncStatus = 'conflict';
 			syncMessage = m['sync.conflict']();
-		} else {
-			syncStatus = 'success';
-			syncMessage = m['sync.downloadSuccess']();
+			return;
 		}
-	}
-
-	function forceDownload() {
-		if (!isConfigured({ url, username, password, autoSync })) return;
-		syncStatus = 'downloading';
-		syncMessage = '';
-		downloadSnapshot(url, username, password).then((result) => {
-			if (result.ok && result.snapshot) {
-				applySnapshot(result.snapshot);
-				syncStatus = 'success';
-				syncMessage = m['sync.downloadSuccess']();
-				webdavConfig.set({
-					url,
-					username,
-					password,
-					autoSync,
-					lastSyncAt: new Date().toISOString()
-				});
-			} else {
-				syncStatus = 'error';
-				syncMessage = result.error ?? m['sync.testFail']();
-			}
-		});
-	}
-
-	function formatLastSync(iso?: string): string {
-		if (!iso) return '—';
-		try {
-			return new Date(iso).toLocaleString();
-		} catch {
-			return iso;
-		}
+		applySnapshot(result.snapshot);
+		syncStatus = 'success';
+		syncMessage = m['sync.downloadSuccess']();
+		await saveConfig(new Date().toISOString());
 	}
 </script>
 
-<svelte:head>
-	<title>{m['sync.pageTitle']()}</title>
-</svelte:head>
-
+<svelte:head><title>{m['sync.pageTitle']()}</title></svelte:head>
 <div class="container mx-auto max-w-2xl space-y-6 px-6 py-10">
-	<Card.Root>
-		<Card.Header>
-			<Card.Title>{m['sync.title']()}</Card.Title>
-			<Card.Description>{m['sync.subtitle']()}</Card.Description>
-		</Card.Header>
-		<Card.Content class="space-y-4">
+	<VaultGate />
+	{#if needsPasswordMigration($webdavConfig)}
+		<p
+			class="rounded-md border border-[var(--q-dificil)]/30 bg-[color-mix(in_oklch,var(--q-dificil)_8%,transparent)] px-3 py-2 text-xs"
+		>
+			{m['vault.legacyPassword']()}
+		</p>
+	{/if}
+	<Card.Root
+		><Card.Header
+			><Card.Title>{m['sync.title']()}</Card.Title><Card.Description
+				>{m['sync.subtitle']()}</Card.Description
+			></Card.Header
+		><Card.Content class="space-y-4">
 			<div class="space-y-2">
-				<Label for="sync-url">{m['sync.url']()}</Label>
-				<Input id="sync-url" type="url" placeholder="https://dav.example.com" bind:value={url} />
-			</div>
-			<div class="space-y-2">
-				<Label for="sync-user">{m['sync.username']()}</Label>
-				<Input id="sync-user" type="text" bind:value={username} />
-			</div>
-			<div class="space-y-2">
-				<Label for="sync-pass">{m['sync.password']()}</Label>
-				<Input id="sync-pass" type="password" bind:value={password} />
-			</div>
-
-			<div class="flex items-center gap-2">
-				<input
-					id="sync-auto"
-					type="checkbox"
-					class="h-4 w-4 rounded border-gray-300"
-					bind:checked={autoSync}
+				<Label for="sync-url">{m['sync.url']()}</Label><Input
+					id="sync-url"
+					type="url"
+					bind:value={url}
 				/>
-				<Label for="sync-auto" class="cursor-pointer">{m['sync.autoSync']()}</Label>
 			</div>
-
-			{#if testStatus !== 'idle'}
-				<div class="flex items-center gap-2 text-sm" class:text-green-600={testStatus === 'success'} class:text-red-600={testStatus === 'error'} class:text-yellow-600={testStatus === 'testing'}>
-					{#if testStatus === 'success'}<CheckCircle2 class="h-4 w-4" />{/if}
-					{#if testStatus === 'error'}<XCircle class="h-4 w-4" />{/if}
-					{#if testStatus === 'testing'}<RefreshCw class="h-4 w-4 animate-spin" />{/if}
-					<span>{testMessage}</span>
-				</div>
-			{/if}
-
+			<div class="space-y-2">
+				<Label for="sync-user">{m['sync.username']()}</Label><Input
+					id="sync-user"
+					type="text"
+					bind:value={username}
+				/>
+			</div>
+			<div class="space-y-2">
+				<Label for="sync-pass">{m['sync.password']()}</Label><Input
+					id="sync-pass"
+					type="password"
+					autocomplete="off"
+					bind:value={password}
+				/>
+				<p class="text-xs text-muted-foreground">{m['vault.secretNotPrefilled']()}</p>
+			</div>
+			<div class="flex items-center gap-2">
+				<input id="sync-auto" type="checkbox" class="h-4 w-4" bind:checked={autoSync} /><Label
+					for="sync-auto">{m['sync.autoSync']()}</Label
+				>
+			</div>
+			{#if testStatus !== 'idle'}<p role="status" aria-live="polite" class="text-sm">
+					{testMessage}
+				</p>{/if}
+			<Button
+				variant="outline"
+				onclick={handleTest}
+				disabled={testStatus === 'testing' || $vaultState.status !== 'unlocked'}
+				>{testStatus === 'testing' ? m['sync.testing']() : m['sync.test']()}</Button
+			>
+		</Card.Content></Card.Root
+	>
+	<Card.Root
+		><Card.Header><Card.Title>{m['sync.actions']()}</Card.Title></Card.Header><Card.Content
+			class="space-y-4"
+		>
+			{#if syncStatus !== 'idle'}<p role="status" aria-live="polite" class="text-sm">
+					{syncMessage}
+				</p>{/if}
 			<div class="flex flex-wrap gap-2">
-				<Button variant="outline" onclick={handleTest} disabled={testStatus === 'testing'}>
-					{testStatus === 'testing' ? m['sync.testing']() : m['sync.test']()}
-				</Button>
+				<Button
+					onclick={handleUpload}
+					disabled={syncStatus === 'uploading' ||
+						syncStatus === 'downloading' ||
+						$vaultState.status !== 'unlocked'}
+					><CloudUpload class="mr-2 h-4 w-4" />{m['sync.upload']()}</Button
+				>
+				<Button
+					variant="outline"
+					onclick={() => handleDownload()}
+					disabled={syncStatus === 'uploading' ||
+						syncStatus === 'downloading' ||
+						$vaultState.status !== 'unlocked'}
+					><CloudDownload class="mr-2 h-4 w-4" />{m['sync.download']()}</Button
+				>
 			</div>
-		</Card.Content>
-	</Card.Root>
-
-	<Card.Root>
-		<Card.Header>
-			<Card.Title>{m['sync.actions']()}</Card.Title>
-			<Card.Description>{m['sync.lastSync']()}: {formatLastSync($webdavConfig?.lastSyncAt)}</Card.Description>
-		</Card.Header>
-		<Card.Content class="space-y-4">
-			{#if syncStatus !== 'idle'}
-				<div class="flex items-center gap-2 text-sm" class:text-green-600={syncStatus === 'success'} class:text-red-600={syncStatus === 'error'} class:text-yellow-600={syncStatus === 'uploading' || syncStatus === 'downloading'} class:text-orange-600={syncStatus === 'conflict'}>
-					{#if syncStatus === 'success'}<CheckCircle2 class="h-4 w-4" />{/if}
-					{#if syncStatus === 'error'}<XCircle class="h-4 w-4" />{/if}
-					{#if syncStatus === 'conflict'}<AlertTriangle class="h-4 w-4" />{/if}
-					{#if syncStatus === 'uploading' || syncStatus === 'downloading'}<RefreshCw class="h-4 w-4 animate-spin" />{/if}
-					<span>{syncMessage}</span>
-				</div>
-			{/if}
-
-			<div class="flex flex-wrap gap-2">
-				<Button onclick={handleUpload} disabled={syncStatus === 'uploading' || syncStatus === 'downloading' || !isConfigured({ url, username, password, autoSync })}>
-					<CloudUpload class="mr-2 h-4 w-4" />
-					{syncStatus === 'uploading' ? m['sync.uploading']() : m['sync.upload']()}
-				</Button>
-				<Button variant="outline" onclick={handleDownload} disabled={syncStatus === 'uploading' || syncStatus === 'downloading' || !isConfigured({ url, username, password, autoSync })}>
-					<CloudDownload class="mr-2 h-4 w-4" />
-					{syncStatus === 'downloading' ? m['sync.downloading']() : m['sync.download']()}
-				</Button>
-			</div>
-
-			{#if syncStatus === 'conflict'}
-				<Button variant="destructive" size="sm" onclick={forceDownload}>
-					{m['sync.forceDownload']()}
-				</Button>
-			{/if}
-		</Card.Content>
-	</Card.Root>
+			{#if syncStatus === 'conflict'}<Button
+					variant="destructive"
+					size="sm"
+					onclick={() => handleDownload(true)}>{m['sync.forceDownload']()}</Button
+				>{/if}
+		</Card.Content></Card.Root
+	>
 </div>

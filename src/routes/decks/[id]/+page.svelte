@@ -8,14 +8,25 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { goto } from '$app/navigation';
-	import { ArrowLeft, Trash2, Plus, Upload, FileText, FileUp, Download } from '@lucide/svelte';
-	import { parseImport } from '$lib/import.js';
+	import {
+		ArrowLeft,
+		Trash2,
+		Plus,
+		Upload,
+		FileText,
+		FileUp,
+		Download,
+		Share2
+	} from '@lucide/svelte';
+	import { parseImport, MAX_IMPORT_BYTES } from '$lib/import.js';
 	import { haptic } from '$lib/haptics.js';
-	import AIGenerateDialog from '$lib/components/ai/ai-generate-dialog.svelte';
 	import MarkdownRenderer from '$lib/components/markdown-renderer.svelte';
 	import * as m from '$lib/paraglide/messages.js';
 	import { buildDeckExport } from '$lib/deck-export.js';
 	import { exportToAnkiCsv, downloadAnkiCsv } from '$lib/anki-export.js';
+	import { buildShareUrl } from '$lib/deck-share.js';
+	import type { Deck } from '$lib/types.js';
+	import { importApkgFile } from '$lib/apkg-import.js';
 
 	const deckId = page.params.id ?? '';
 
@@ -39,11 +50,41 @@
 	let deletingId: string | null = $state(null);
 	let deleteOpen = $state(false);
 	let editorMode = $state<'edit' | 'preview'>('edit');
+	let sm2InitialInterval = $state(1);
+	let sm2EfModifier = $state(0);
+	let sm2MaxInterval = $state(0);
+	let shareState = $state<'idle' | 'copied' | 'manual'>('idle');
+	let shareUrl = $state('');
+	let apkgBusy = $state(false);
+
+	$effect(() => {
+		if (deck?.sm2Overrides) {
+			sm2InitialInterval = deck.sm2Overrides.initialInterval ?? 1;
+			sm2EfModifier = deck.sm2Overrides.efModifier ?? 0;
+			sm2MaxInterval = deck.sm2Overrides.maxInterval ?? 0;
+		}
+	});
+
+	function updateSm2Overrides() {
+		if (!deck) return;
+		const overrides: Deck['sm2Overrides'] = {};
+		if (sm2InitialInterval !== 1) overrides.initialInterval = sm2InitialInterval;
+		if (sm2EfModifier !== 0) overrides.efModifier = sm2EfModifier;
+		if (sm2MaxInterval > 0) overrides.maxInterval = sm2MaxInterval;
+		decks.update((all) =>
+			all.map((d) =>
+				d.id === deckId
+					? { ...d, sm2Overrides: Object.keys(overrides).length > 0 ? overrides : undefined }
+					: d
+			)
+		);
+		flashSaved();
+	}
 
 	let importOpen = $state(false);
 	let activeTab = $state('file');
 	let importText = $state('');
-	let importParsed: { front: string; back: string }[] = $state([]);
+	let importParsed: { front: string; back: string; cloze?: string; tags?: string[] }[] = $state([]);
 	let importError = $state('');
 	let fileName = $state('');
 
@@ -64,7 +105,18 @@
 		const now = new Date().toISOString();
 		cards.update((all) => [
 			...all,
-			{ id: generateId(), deckId, front: front.trim(), back: back.trim(), tags: [...cardTags], interval: 0, repetitions: 0, easeFactor: 2.5, dueDate: now, createdAt: now }
+			{
+				id: generateId(),
+				deckId,
+				front: front.trim(),
+				back: back.trim(),
+				tags: [...cardTags],
+				interval: 0,
+				repetitions: 0,
+				easeFactor: 2.5,
+				dueDate: now,
+				createdAt: now
+			}
 		]);
 		haptic(10);
 		front = '';
@@ -112,7 +164,7 @@
 			deckId,
 			front: c.front,
 			back: c.back,
-			tags: [],
+			tags: c.tags ?? [],
 			interval: 0,
 			repetitions: 0,
 			easeFactor: 2.5,
@@ -132,7 +184,30 @@
 		const target = e.target as HTMLInputElement;
 		const file = target.files?.[0];
 		if (!file) return;
-		fileName = file.name;
+		importError = '';
+		if (file.size > MAX_IMPORT_BYTES) {
+			importError = m['import.tooLarge']();
+			fileName = '';
+			target.value = '';
+			return;
+		}
+		const name = file.name.toLowerCase();
+		if (name.endsWith('.apkg')) {
+			fileName = file.name;
+			apkgBusy = true;
+			try {
+				const parsed = await importApkgFile(new Uint8Array(await file.arrayBuffer()));
+				importParsed = parsed.cards;
+				if (parsed.skipped > 0) importError = m['deck.apkgSkipped']({ count: parsed.skipped });
+			} catch {
+				importError = m['deck.apkgError']();
+				importParsed = [];
+			} finally {
+				apkgBusy = false;
+				target.value = '';
+			}
+			return;
+		}
 		const text = await file.text();
 		runParse(text);
 		target.value = '';
@@ -163,6 +238,20 @@
 		downloadAnkiCsv(filename, csv);
 		haptic(10);
 	}
+
+	async function handleShare() {
+		if (!deck) return;
+		const url = buildShareUrl(window.location.origin, deck, deckCards);
+		try {
+			await navigator.clipboard.writeText(url);
+			shareState = 'copied';
+		} catch {
+			shareState = 'manual';
+			shareUrl = url;
+		}
+		setTimeout(() => (shareState = 'idle'), 6000);
+		haptic(10);
+	}
 </script>
 
 <div class="container mx-auto max-w-4xl space-y-6 p-5 sm:p-6">
@@ -170,28 +259,53 @@
 		<Button variant="ghost" size="icon" href="/" aria-label={m['deck.back']()}>
 			<ArrowLeft class="size-[18px] [stroke-width:1.75]" />
 		</Button>
-		<div class="flex-1 min-w-0">
+		<div class="min-w-0 flex-1">
 			<Input
 				value={deck?.name ?? ''}
 				oninput={updateDeckName}
-				class="h-auto border-none bg-transparent px-0 py-2 font-display text-2xl font-normal tracking-[-0.02em] shadow-none focus-visible:ring-0 {savedFlash ? '!text-accent' : ''}"
+				class="h-auto border-none bg-transparent px-0 py-2 font-display text-2xl font-normal tracking-[-0.02em] shadow-none focus-visible:ring-0 {savedFlash
+					? '!text-accent'
+					: ''}"
 				placeholder={m['deck.placeholder']()}
 			/>
 			{#if savedFlash}
-				<span class="font-mono text-[10px] font-bold tracking-[0.08em] uppercase text-accent">{m['deck.saved']()}</span>
+				<span class="font-mono text-[10px] font-bold tracking-[0.08em] text-accent uppercase"
+					>{m['deck.saved']()}</span
+				>
 			{/if}
 		</div>
+		<Button variant="ghost" size="icon" onclick={handleShare} aria-label={m['deck.share']()}>
+			<Share2 class="size-[18px] [stroke-width:1.75]" />
+		</Button>
 		<Button variant="ghost" size="icon" onclick={handleExport} aria-label={m['deck.export']()}>
 			<Download class="size-[18px] [stroke-width:1.75]" />
 		</Button>
 		<Button variant="ghost" size="icon" onclick={handleAnkiExport} aria-label={m['anki.export']()}>
 			<FileText class="size-[18px] [stroke-width:1.75]" />
 		</Button>
-		<AIGenerateDialog deckId={deckId} deckName={deck?.name} />
+		{#if shareState === 'copied'}
+			<span class="text-xs text-accent" role="status">{m['deck.shareCopied']()}</span>
+		{:else if shareState === 'manual'}
+			<div
+				class="absolute top-16 right-5 z-30 w-[min(90vw,420px)] rounded-md border border-border bg-card p-3 shadow-lg"
+			>
+				<label class="text-xs text-muted-foreground" for="share-url"
+					>{m['deck.shareManual']()}</label
+				>
+				<input
+					id="share-url"
+					readonly
+					value={shareUrl}
+					class="mt-1 w-full rounded border border-border bg-background px-2 py-1 text-xs"
+					onclick={(event) => (event.currentTarget as HTMLInputElement).select()}
+				/>
+			</div>
+		{/if}
 		<Dialog.Root bind:open={importOpen}>
 			<Dialog.Trigger>
 				<Button variant="outline" size="sm" class="gap-1.5">
-					<Upload class="size-[18px] [stroke-width:1.75]" /> {m['deck.import']()}
+					<Upload class="size-[18px] [stroke-width:1.75]" />
+					{m['deck.import']()}
 				</Button>
 			</Dialog.Trigger>
 			<Dialog.Content class="sm:max-w-[520px]">
@@ -203,28 +317,49 @@
 				<div class="flex w-full items-center justify-center rounded-md bg-secondary p-1">
 					<button
 						onclick={() => (activeTab = 'file')}
-						class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors {activeTab === 'file' ? 'bg-card shadow-sm border border-border' : 'text-muted-foreground'}"
+						class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors {activeTab ===
+						'file'
+							? 'border border-border bg-card shadow-sm'
+							: 'text-muted-foreground'}"
 					>
-						<span class="flex items-center justify-center gap-1.5"><FileUp class="size-[18px] [stroke-width:1.75]" /> {m['deck.file']()}</span>
+						<span class="flex items-center justify-center gap-1.5"
+							><FileUp class="size-[18px] [stroke-width:1.75]" /> {m['deck.file']()}</span
+						>
 					</button>
 					<button
 						onclick={() => (activeTab = 'text')}
-						class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors {activeTab === 'text' ? 'bg-card shadow-sm border border-border' : 'text-muted-foreground'}"
+						class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors {activeTab ===
+						'text'
+							? 'border border-border bg-card shadow-sm'
+							: 'text-muted-foreground'}"
 					>
-						<span class="flex items-center justify-center gap-1.5"><FileText class="size-[18px] [stroke-width:1.75]" /> {m['deck.text']()}</span>
+						<span class="flex items-center justify-center gap-1.5"
+							><FileText class="size-[18px] [stroke-width:1.75]" /> {m['deck.text']()}</span
+						>
 					</button>
 				</div>
 
 				<div class="py-3">
 					{#if activeTab === 'file'}
-						<div class="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-card/50 p-6 text-center">
-							<div class="grid size-12 place-items-center rounded-md bg-[var(--accent-soft)] border border-[color-mix(in_oklch,var(--accent-text)_20%,transparent)]">
-								<Upload class="size-[22px] text-accent [stroke-width:1.75]" />
+						<div
+							class="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-card/50 p-6 text-center"
+						>
+							<div
+								class="grid size-12 place-items-center rounded-md border border-[color-mix(in_oklch,var(--accent-text)_20%,transparent)] bg-[var(--accent-soft)]"
+							>
+								<Upload class="size-[22px] [stroke-width:1.75] text-accent" />
 							</div>
 							<p class="text-sm font-medium">{m['deck.drop']()}</p>
 							<p class="font-mono text-xs text-muted-foreground">{m['deck.fileHint']()}</p>
-							<Input type="file" accept=".json,.md,.txt" onchange={handleFileUpload} class="max-w-xs cursor-pointer" />
-							{#if fileName}
+							<Input
+								type="file"
+								accept=".json,.md,.txt,.apkg"
+								onchange={handleFileUpload}
+								class="max-w-xs cursor-pointer"
+							/>
+							{#if apkgBusy}
+								<p class="font-mono text-xs text-muted-foreground">{m['deck.apkgReading']()}</p>
+							{:else if fileName}
 								<p class="font-mono text-xs text-muted-foreground">{fileName}</p>
 							{/if}
 						</div>
@@ -233,46 +368,66 @@
 							<Label>{m['deck.paste']()}</Label>
 							<Textarea
 								bind:value={importText}
+								maxlength={50000}
 								placeholder={'# Pergunta\nResposta\n---\n# Outra pergunta\nOutra resposta'}
 								rows={7}
 								class="font-mono text-xs"
 							/>
 							<p class="font-mono text-xs text-muted-foreground">{m['deck.textHint']()}</p>
-							<Button onclick={handleTextParse} class="w-full" variant="secondary">{m['deck.preview']()}</Button>
+							<Button onclick={handleTextParse} class="w-full" variant="secondary"
+								>{m['deck.preview']()}</Button
+							>
 						</div>
 					{/if}
 
 					{#if importError}
-						<p class="mt-3 rounded-md border border-[var(--q-errei)]/30 bg-[color-mix(in_oklch,var(--q-errei)_10%,transparent)] px-3 py-2 text-xs text-[var(--q-errei)]">{importError}</p>
+						<p
+							class="mt-3 rounded-md border border-[var(--q-errei)]/30 bg-[color-mix(in_oklch,var(--q-errei)_10%,transparent)] px-3 py-2 text-xs text-[var(--q-errei)]"
+						>
+							{importError}
+						</p>
 					{/if}
 
 					{#if importParsed.length > 0}
 						<div class="mt-3 space-y-2">
 							<div class="flex items-center gap-2 font-mono text-xs text-muted-foreground">
-								<span class="num font-bold text-foreground">{importParsed.length}</span> {m['deck.detected']({ count: importParsed.length })}
-								<span class="ml-auto h-1 w-24 rounded-md bg-border overflow-hidden">
+								<span class="num font-bold text-foreground">{importParsed.length}</span>
+								{m['deck.detected']({ count: importParsed.length })}
+								<span class="ml-auto h-1 w-24 overflow-hidden rounded-md bg-border">
 									<span class="block h-full bg-[var(--accent-text)]" style="width: 100%"></span>
 								</span>
 							</div>
-							<div class="max-h-[220px] overflow-auto rounded-md border bg-secondary/30 p-2 space-y-1.5">
+							<div
+								class="max-h-[220px] space-y-1.5 overflow-auto rounded-md border bg-secondary/30 p-2"
+							>
 								{#each importParsed.slice(0, 20) as c}
 									<div class="rounded-md border bg-card px-3 py-2">
-										<p class="text-xs font-semibold truncate">{c.front}</p>
-										<p class="text-xs text-muted-foreground truncate">{c.back}</p>
+										<p class="truncate text-xs font-semibold">{c.front}</p>
+										<p class="truncate text-xs text-muted-foreground">{c.back}</p>
 									</div>
 								{/each}
 								{#if importParsed.length > 20}
-									<p class="text-center font-mono text-xs text-muted-foreground">{m['deck.more']({ count: importParsed.length - 20 })}</p>
+									<p class="text-center font-mono text-xs text-muted-foreground">
+										{m['deck.more']({ count: importParsed.length - 20 })}
+									</p>
 								{/if}
 							</div>
-							<Button onclick={doImport} class="w-full">{m['deck.importBatch']({ count: importParsed.length })}</Button>
+							<Button onclick={doImport} class="w-full"
+								>{m['deck.importBatch']({ count: importParsed.length })}</Button
+							>
 						</div>
 					{/if}
 				</div>
 			</Dialog.Content>
 		</Dialog.Root>
 
-		<Button variant="ghost" size="icon" onclick={() => (deleteOpen = true)} aria-label={m['deck.deleteAria']()} class="text-muted-foreground hover:text-[var(--q-errei)]">
+		<Button
+			variant="ghost"
+			size="icon"
+			onclick={() => (deleteOpen = true)}
+			aria-label={m['deck.deleteAria']()}
+			class="text-muted-foreground hover:text-[var(--q-errei)]"
+		>
 			<Trash2 class="size-[18px] [stroke-width:1.75]" />
 		</Button>
 	</div>
@@ -286,8 +441,12 @@
 				</Dialog.Description>
 			</Dialog.Header>
 			<Dialog.Footer>
-				<Button variant="outline" onclick={() => (deleteOpen = false)}> {m['deck.keep']()}</Button>
-				<Button variant="destructive" onclick={deleteDeck}> {deckCards.length === 1 ? m['deck.deleteConfirm.one']({ count: 1 }) : m['deck.deleteConfirm']({ count: deckCards.length })}</Button>
+				<Button variant="outline" onclick={() => (deleteOpen = false)}>{m['deck.keep']()}</Button>
+				<Button variant="destructive" onclick={deleteDeck}>
+					{deckCards.length === 1
+						? m['deck.deleteConfirm.one']({ count: 1 })
+						: m['deck.deleteConfirm']({ count: deckCards.length })}</Button
+				>
 			</Dialog.Footer>
 		</Dialog.Content>
 	</Dialog.Root>
@@ -295,26 +454,44 @@
 	<div class="grid gap-6 md:grid-cols-[2fr_1fr]">
 		<div class="space-y-3">
 			<div class="flex items-center justify-between">
-				<h2 class="font-display text-[18px]"> {m['deck.cards']({ count: deckCards.length })}</h2>
+				<h2 class="font-display text-[18px]">{m['deck.cards']({ count: deckCards.length })}</h2>
 			</div>
 
 			{#if deckCards.length === 0}
 				<div class="rounded-lg border border-dashed bg-card/50 py-10 text-center">
-					<p class="text-sm text-muted-foreground"> {m['deck.noCards']()}</p>
-					<p class="mx-auto mt-1 max-w-xs font-mono text-xs text-muted-foreground"> {m['deck.noCardsHint']()}</p>
-					<Button variant="ghost" size="sm" class="mt-3" onclick={() => (importOpen = true)}> {m['deck.importCards']()}</Button>
+					<p class="text-sm text-muted-foreground">{m['deck.noCards']()}</p>
+					<p class="mx-auto mt-1 max-w-xs font-mono text-xs text-muted-foreground">
+						{m['deck.noCardsHint']()}
+					</p>
+					<Button variant="ghost" size="sm" class="mt-3" onclick={() => (importOpen = true)}>
+						{m['deck.importCards']()}</Button
+					>
 				</div>
 			{/if}
 
 			{#each deckCards as card (card.id)}
 				{@const leaving = deletingId === card.id}
-				<Card.Root class="rounded-lg transition-[transform,opacity] duration-[160ms] {leaving ? 'opacity-0 -translate-x-2 scale-[0.98]' : 'opacity-100'}">
+				<Card.Root
+					class="rounded-lg transition-[transform,opacity] duration-[160ms] {leaving
+						? '-translate-x-2 scale-[0.98] opacity-0'
+						: 'opacity-100'}"
+				>
 					<Card.Content class="flex items-start justify-between gap-3 p-4">
-						<div class="grid flex-1 gap-1.5 min-w-0">
-							<div class="border-b border-border pb-2 text-sm font-semibold truncate">{card.front}</div>
-							<div class="whitespace-pre-wrap text-sm text-muted-foreground break-words">{card.back}</div>
+						<div class="grid min-w-0 flex-1 gap-1.5">
+							<div class="truncate border-b border-border pb-2 text-sm font-semibold">
+								{card.front}
+							</div>
+							<div class="text-sm break-words whitespace-pre-wrap text-muted-foreground">
+								{card.back}
+							</div>
 						</div>
-						<Button variant="ghost" size="icon" class="shrink-0 text-muted-foreground hover:text-[var(--q-errei)]" onclick={() => deleteCard(card.id)} aria-label={m['deck.deleteCardAria']()}>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="shrink-0 text-muted-foreground hover:text-[var(--q-errei)]"
+							onclick={() => deleteCard(card.id)}
+							aria-label={m['deck.deleteCardAria']()}
+						>
 							<Trash2 class="size-[18px] [stroke-width:1.75]" />
 						</Button>
 					</Card.Content>
@@ -330,8 +507,22 @@
 				<Card.Content class="space-y-3">
 					<div class="flex items-center justify-between gap-2">
 						<div class="inline-flex rounded-md border bg-secondary/50 p-0.5">
-							<button type="button" onclick={() => (editorMode = 'edit')} class="rounded px-3 py-1 text-xs font-semibold transition-colors {editorMode === 'edit' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}">{m['editor.edit']()}</button>
-							<button type="button" onclick={() => (editorMode = 'preview')} class="rounded px-3 py-1 text-xs font-semibold transition-colors {editorMode === 'preview' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}">{m['editor.preview']()}</button>
+							<button
+								type="button"
+								onclick={() => (editorMode = 'edit')}
+								class="rounded px-3 py-1 text-xs font-semibold transition-colors {editorMode ===
+								'edit'
+									? 'bg-background text-foreground shadow-sm'
+									: 'text-muted-foreground hover:text-foreground'}">{m['editor.edit']()}</button
+							>
+							<button
+								type="button"
+								onclick={() => (editorMode = 'preview')}
+								class="rounded px-3 py-1 text-xs font-semibold transition-colors {editorMode ===
+								'preview'
+									? 'bg-background text-foreground shadow-sm'
+									: 'text-muted-foreground hover:text-foreground'}">{m['editor.preview']()}</button
+							>
 						</div>
 						<span class="text-[10px] text-muted-foreground">{m['editor.markdownHint']()}</span>
 					</div>
@@ -347,17 +538,30 @@
 					{:else}
 						<div class="space-y-1.5">
 							<Label>{m['deck.front']()}</Label>
-							<div class="min-h-[72px] rounded-md border bg-card px-3 py-2"><MarkdownRenderer content={front} /></div>
+							<div class="min-h-[72px] rounded-md border bg-card px-3 py-2">
+								<MarkdownRenderer content={front} />
+							</div>
 						</div>
 						<div class="space-y-1.5">
 							<Label>{m['deck.backField']()}</Label>
-							<div class="min-h-[96px] rounded-md border bg-card px-3 py-2"><MarkdownRenderer content={back} /></div>
+							<div class="min-h-[96px] rounded-md border bg-card px-3 py-2">
+								<MarkdownRenderer content={back} />
+							</div>
 						</div>
 					{/if}
 					<div class="space-y-1.5">
 						<Label>{m['tags.add']()}</Label>
 						<div class="flex gap-2">
-							<Input bind:value={newTag} placeholder={m['tags.placeholder']()} onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }} />
+							<Input
+								bind:value={newTag}
+								placeholder={m['tags.placeholder']()}
+								onkeydown={(e) => {
+									if (e.key === 'Enter') {
+										e.preventDefault();
+										addTag();
+									}
+								}}
+							/>
 							<Button variant="outline" size="icon" onclick={addTag} aria-label={m['tags.add']()}>
 								<Plus class="size-[18px] [stroke-width:1.75]" />
 							</Button>
@@ -365,10 +569,25 @@
 						{#if cardTags.length > 0}
 							<div class="flex flex-wrap gap-1.5 pt-1">
 								{#each cardTags as tag}
-									<span class="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
+									<span
+										class="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground"
+									>
 										{tag}
-										<button type="button" onclick={() => removeTag(tag)} aria-label={m['tags.remove']({ tag })} class="ml-0.5 rounded-full p-0.5 hover:bg-background/50">
-											<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+										<button
+											type="button"
+											onclick={() => removeTag(tag)}
+											aria-label={m['tags.remove']({ tag })}
+											class="ml-0.5 rounded-full p-0.5 hover:bg-background/50"
+										>
+											<svg
+												width="12"
+												height="12"
+												viewBox="0 0 24 24"
+												fill="none"
+												stroke="currentColor"
+												stroke-width="2"
+												stroke-linecap="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg
+											>
 										</button>
 									</span>
 								{/each}
@@ -376,8 +595,54 @@
 						{/if}
 					</div>
 					<Button onclick={addCard} class="w-full">
-						<Plus class="size-[18px] [stroke-width:1.75]" /> {m['deck.add']()}
+						<Plus class="size-[18px] [stroke-width:1.75]" />
+						{m['deck.add']()}
 					</Button>
+				</Card.Content>
+			</Card.Root>
+			<Card.Root class="rounded-lg">
+				<Card.Header>
+					<Card.Title class="text-sm">{m['sm2.title']()}</Card.Title>
+					<Card.Description class="text-xs text-muted-foreground"
+						>{m['sm2.description']()}</Card.Description
+					>
+				</Card.Header>
+				<Card.Content class="space-y-3">
+					<div class="space-y-1.5">
+						<Label class="text-xs">{m['sm2.initialInterval']()}</Label>
+						<Input
+							type="number"
+							min="1"
+							max="30"
+							bind:value={sm2InitialInterval}
+							onchange={updateSm2Overrides}
+							class="h-8 text-sm"
+						/>
+					</div>
+					<div class="space-y-1.5">
+						<Label class="text-xs">{m['sm2.efModifier']()}</Label>
+						<Input
+							type="number"
+							step="0.01"
+							min="-0.5"
+							max="0.5"
+							bind:value={sm2EfModifier}
+							onchange={updateSm2Overrides}
+							class="h-8 text-sm"
+						/>
+					</div>
+					<div class="space-y-1.5">
+						<Label class="text-xs">{m['sm2.maxInterval']()}</Label>
+						<Input
+							type="number"
+							min="0"
+							max="3650"
+							bind:value={sm2MaxInterval}
+							onchange={updateSm2Overrides}
+							class="h-8 text-sm"
+							placeholder="0 = unlimited"
+						/>
+					</div>
 				</Card.Content>
 			</Card.Root>
 		</div>

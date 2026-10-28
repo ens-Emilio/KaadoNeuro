@@ -14,7 +14,7 @@ La aplicación puede instalarse como PWA, utilizarse sin conexión después de l
 
 - **Repetición espaciada SM-2**: intervalos de repaso según la calidad del recuerdo.
 - **Mazos y tarjetas**: organiza varios temas con un flujo de estudio enfocado.
-- **Importación masiva**: importa JSON, Markdown o texto plano.
+- **Importación masiva**: importa JSON, Markdown, texto plano o paquetes `.apkg` de Anki.
 - **Estadísticas**: volumen de repasos, cantidad de tarjetas y distribución de calidad SM-2.
 - **Interfaz editorial**: temas claro y oscuro, diseño adaptable y un sistema visual tranquilo.
 - **13 idiomas**: portugués, inglés, español, francés, alemán, chino simplificado, japonés, coreano, árabe, hindi, indonesio, turco y vietnamita.
@@ -55,11 +55,14 @@ src/
 
 ## Ejecutar localmente
 
-Requisitos: Node.js 24 y npm.
+Requisitos: Node.js **22.12 o superior** (validado en Node 24) y **pnpm 10**.
+
+El repositorio mantiene solo `pnpm-lock.yaml`; `npm install` y `yarn install` no reproducen el conjunto de dependencias probado.
 
 ```bash
-npm ci
-npm run dev
+corepack enable
+pnpm install
+pnpm dev
 ```
 
 Abre la URL local que muestra Vite.
@@ -67,8 +70,8 @@ Abre la URL local que muestra Vite.
 ## Compilación de producción
 
 ```bash
-npm run build
-npm run preview
+pnpm build
+pnpm preview
 ```
 
 El sitio estático se genera en `build/`.
@@ -85,17 +88,20 @@ Consulta [DEPLOY.md](DEPLOY.md) para más detalles.
 
 Dentro de un mazo, elige **Importar** y usa una de estas opciones:
 
-1. **Archivo**: selecciona `.json`, `.md` o `.txt`.
+1. **Archivo**: selecciona `.json`, `.md`, `.txt` o un `.apkg` de Anki. El `.apkg` aporta el nombre del mazo, el texto de los campos (HTML convertido) y las etiquetas; las notas sin reverso se omiten y el total se informa en la vista previa.
 2. **Texto**: pega el contenido directamente.
 
 Formato Markdown:
 
 ```markdown
 # Pregunta
+
 Texto de la respuesta.
 Puede ocupar varias líneas.
 ---
+
 # Otra pregunta
+
 Otra respuesta.
 ```
 
@@ -103,8 +109,8 @@ Formato JSON:
 
 ```json
 [
-  { "front": "Pregunta", "back": "Respuesta" },
-  { "front": "Término", "back": "Definición" }
+	{ "front": "Pregunta", "back": "Respuesta" },
+	{ "front": "Término", "back": "Definición" }
 ]
 ```
 
@@ -143,10 +149,10 @@ Límites:
 ## Pruebas y comprobaciones
 
 ```bash
-npm run test:unit -- --run
-npm run test:e2e
-npm run check
-npm run build
+pnpm test:unit -- --run
+pnpm test:e2e
+pnpm check
+pnpm build
 ```
 
 ## Licencia

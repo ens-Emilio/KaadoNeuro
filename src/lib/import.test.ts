@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseImport } from './import.js';
+import { MAX_IMPORT_BYTES, parseImport } from './import.js';
 
 describe('parseImport', () => {
 	it('parseia JSON array válido com front/back', () => {
@@ -78,8 +78,12 @@ describe('parseImport', () => {
 		const result = parseImport(input, 50000);
 		expect(Array.isArray(result)).toBe(false);
 		if (!Array.isArray(result)) {
-			expect(result.error).toContain('Texto muito longo');
+			expect(result.error).toContain('Text too long');
 		}
+	});
+
+	it('expõe o limite compartilhado de 5 MB para uploads', () => {
+		expect(MAX_IMPORT_BYTES).toBe(5 * 1024 * 1024);
 	});
 
 	it('trim e espaços extras são normalizados no formato markdown', () => {

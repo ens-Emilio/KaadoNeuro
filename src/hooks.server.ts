@@ -10,10 +10,15 @@ const security: Handle = async ({ event, resolve }) => {
 	response.headers.set('X-Frame-Options', 'DENY');
 	const csp = [
 		"default-src 'self'",
-		"script-src 'self' 'unsafe-inline'",
+		// 'wasm-unsafe-eval' is required by sql.js, which compiles the SQLite
+		// WebAssembly module that reads .apkg collections. It does not allow
+		// JavaScript eval.
+		"script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'",
+		// Custom OpenAI-compatible base URLs are a supported provider and must be
+		// HTTPS (client.ts enforces it); localhost stays reachable for self-hosted
+		// models during development.
+		"connect-src 'self' https: http://localhost:* http://127.0.0.1:*",
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-		"font-src 'self' https://fonts.gstatic.com",
-		"connect-src 'self' https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com https://openrouter.ai",
 		"img-src 'self' data: blob:",
 		"frame-ancestors 'none'"
 	].join('; ');

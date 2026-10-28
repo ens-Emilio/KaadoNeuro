@@ -61,7 +61,10 @@ describe('exportToAnkiCsv', () => {
 
 	it('handles empty deck', () => {
 		const csv = exportToAnkiCsv(sampleDeck, []);
-		const lines = csv.replace(/^\uFEFF/, '').trim().split('\n');
+		const lines = csv
+			.replace(/^\uFEFF/, '')
+			.trim()
+			.split('\n');
 		expect(lines).toHaveLength(1); // header only
 	});
 
@@ -71,7 +74,10 @@ describe('exportToAnkiCsv', () => {
 			makeCard({ id: '2', front: 'Q2', back: 'A2' })
 		];
 		const csv = exportToAnkiCsv(sampleDeck, cards);
-		const lines = csv.replace(/^\uFEFF/, '').trim().split('\n');
+		const lines = csv
+			.replace(/^\uFEFF/, '')
+			.trim()
+			.split('\n');
 		expect(lines).toHaveLength(3); // header + 2 rows
 	});
 });

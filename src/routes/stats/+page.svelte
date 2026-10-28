@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { stats } from '$lib/stats-store.js';
+	import { stats, heatmapData } from '$lib/stats-store.js';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import { ArrowLeft, BarChart2 } from '@lucide/svelte';
@@ -19,14 +19,19 @@
 			<ArrowLeft class="size-[18px] [stroke-width:1.75]" />
 		</Button>
 		<h1 class="flex items-center gap-2 font-display text-[28px] font-normal tracking-[-0.02em]">
-			<BarChart2 class="size-7 text-accent [stroke-width:1.75]" /> {m['stats.title']()}
+			<BarChart2 class="size-7 [stroke-width:1.75] text-accent" />
+			{m['stats.title']()}
 		</h1>
 	</div>
 
 	<div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
 		<Card.Root class="rounded-lg">
 			<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<Card.Title class="font-mono text-[11px] font-bold tracking-[0.08em] uppercase text-muted-foreground"> {m['stats.decks']()}</Card.Title>
+				<Card.Title
+					class="font-mono text-[11px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
+				>
+					{m['stats.decks']()}</Card.Title
+				>
 			</Card.Header>
 			<Card.Content>
 				<div class="font-display text-[30px] leading-none">{$stats.totalDecks}</div>
@@ -34,7 +39,11 @@
 		</Card.Root>
 		<Card.Root class="rounded-lg">
 			<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<Card.Title class="font-mono text-[11px] font-bold tracking-[0.08em] uppercase text-muted-foreground"> {m['stats.cards']()}</Card.Title>
+				<Card.Title
+					class="font-mono text-[11px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
+				>
+					{m['stats.cards']()}</Card.Title
+				>
 			</Card.Header>
 			<Card.Content>
 				<div class="font-display text-[30px] leading-none">{$stats.totalCards}</div>
@@ -42,7 +51,11 @@
 		</Card.Root>
 		<Card.Root class="rounded-lg">
 			<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<Card.Title class="font-mono text-[11px] font-bold tracking-[0.08em] uppercase text-muted-foreground"> {m['stats.today']()}</Card.Title>
+				<Card.Title
+					class="font-mono text-[11px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
+				>
+					{m['stats.today']()}</Card.Title
+				>
 			</Card.Header>
 			<Card.Content>
 				<div class="font-display text-[30px] leading-none">{$stats.reviewsToday}</div>
@@ -50,36 +63,83 @@
 		</Card.Root>
 		<Card.Root class="rounded-lg">
 			<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-2">
-				<Card.Title class="font-mono text-[11px] font-bold tracking-[0.08em] uppercase text-muted-foreground"> {m['stats.quality']()}</Card.Title>
+				<Card.Title
+					class="font-mono text-[11px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
+				>
+					{m['stats.quality']()}</Card.Title
+				>
 			</Card.Header>
 			<Card.Content>
-				<div class="font-display text-[30px] leading-none {$stats.averageQuality >= 4 ? 'text-accent' : ''}">{$stats.averageQuality.toFixed(1)}</div>
-				<p class="font-mono text-[10px] uppercase tracking-wide text-muted-foreground"> {m['stats.qualityOf']()}</p>
+				<div
+					class="font-display text-[30px] leading-none {$stats.averageQuality >= 4
+						? 'text-accent'
+						: ''}"
+				>
+					{$stats.averageQuality.toFixed(1)}
+				</div>
+				<p class="font-mono text-[10px] tracking-wide text-muted-foreground uppercase">
+					{m['stats.qualityOf']()}
+				</p>
 			</Card.Content>
 		</Card.Root>
 	</div>
 
+	<Card.Root class="rounded-lg">
+		<Card.Header>
+			<Card.Title class="text-sm font-semibold">{m['stats.heatmapTitle']()}</Card.Title>
+			<Card.Description class="font-mono text-xs">{m['stats.heatmapDesc']()}</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<div
+				class="grid grid-cols-[repeat(53,minmax(0,1fr))] gap-1"
+				role="img"
+				aria-label={m['stats.heatmapAria']()}
+			>
+				{#each $heatmapData as day}
+					{@const level =
+						day.count === 0 ? 0 : day.count < 3 ? 1 : day.count < 6 ? 2 : day.count < 10 ? 3 : 4}
+					<div
+						class="aspect-square rounded-sm"
+						style="background: var(--heatmap-{level})"
+						title="{day.date}: {day.count}"
+					></div>
+				{/each}
+			</div>
+			<div class="mt-3 flex items-center gap-2 text-[10px] text-muted-foreground">
+				<span>{m['stats.heatmapLess']()}</span>
+				{#each [0, 1, 2, 3, 4] as l}
+					<div class="size-3 rounded-sm" style="background: var(--heatmap-{l})"></div>
+				{/each}
+				<span>{m['stats.heatmapMore']()}</span>
+			</div>
+		</Card.Content>
+	</Card.Root>
+
 	<div class="grid gap-3 md:grid-cols-2">
 		<Card.Root class="rounded-lg">
 			<Card.Header>
-				<Card.Title class="text-sm font-semibold"> {m['stats.byDeck']()}</Card.Title>
+				<Card.Title class="text-sm font-semibold">{m['stats.byDeck']()}</Card.Title>
 			</Card.Header>
 			<Card.Content>
 				<div class="space-y-3">
 					{#each $stats.cardsByDeck as stat}
 						<div class="flex items-center gap-3">
 							<div class="flex-1 truncate text-sm font-medium">{stat.name}</div>
-							<div class="h-2 w-1/2 rounded-md bg-[var(--muted-surface)] overflow-hidden">
+							<div class="h-2 w-1/2 overflow-hidden rounded-md bg-[var(--muted-surface)]">
 								<div
 									class="h-2 rounded-md bg-[var(--accent-text)]"
-									style="width: {$stats.totalCards > 0 ? (stat.count / $stats.totalCards) * 100 : 0}%"
+									style="width: {$stats.totalCards > 0
+										? (stat.count / $stats.totalCards) * 100
+										: 0}%"
 								></div>
 							</div>
-							<div class="num w-8 text-right text-xs text-muted-foreground tabular-nums">{stat.count}</div>
+							<div class="num w-8 text-right text-xs text-muted-foreground tabular-nums">
+								{stat.count}
+							</div>
 						</div>
 					{/each}
 					{#if $stats.cardsByDeck.length === 0}
-						<p class="text-sm text-muted-foreground"> {m['stats.noDecks']()}</p>
+						<p class="text-sm text-muted-foreground">{m['stats.noDecks']()}</p>
 					{/if}
 				</div>
 			</Card.Content>
@@ -87,20 +147,23 @@
 
 		<Card.Root class="rounded-lg">
 			<Card.Header>
-				<Card.Title class="text-sm font-semibold"> {m['stats.progress']()}</Card.Title>
-				<Card.Description class="font-mono text-xs"> {m['stats.progressDesc']()}</Card.Description>
+				<Card.Title class="text-sm font-semibold">{m['stats.progress']()}</Card.Title>
+				<Card.Description class="font-mono text-xs">{m['stats.progressDesc']()}</Card.Description>
 			</Card.Header>
 			<Card.Content>
 				{#if $stats.totalReviews === 0}
-					<div class="flex h-[160px] items-center justify-center text-sm text-muted-foreground"> {m['stats.noReviews']()}</div>
+					<div class="flex h-[160px] items-center justify-center text-sm text-muted-foreground">
+						{m['stats.noReviews']()}
+					</div>
 				{:else}
 					<div class="space-y-2">
 						{#each qualityRows as row}
 							{@const count = $stats.qualityCounts[row.q] ?? 0}
 							{@const pct = $stats.totalReviews ? (count / $stats.totalReviews) * 100 : 0}
 							<div class="flex items-center gap-3">
-								<span class="w-16 font-mono text-xs font-semibold text-foreground">{row.label}</span>
-								<div class="h-2 flex-1 rounded-md bg-[var(--muted-surface)] overflow-hidden">
+								<span class="w-16 font-mono text-xs font-semibold text-foreground">{row.label}</span
+								>
+								<div class="h-2 flex-1 overflow-hidden rounded-md bg-[var(--muted-surface)]">
 									<div class="h-2 rounded-md" style="width:{pct}%; background:{row.color}"></div>
 								</div>
 								<span class="num w-10 text-right text-xs tabular-nums">{count}</span>

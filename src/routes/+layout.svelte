@@ -5,6 +5,9 @@
 	import { localeNames, rtlLocales } from '$lib/i18n/locales.js';
 	import * as m from '$lib/paraglide/messages.js';
 	import { themePreference, applyTheme, type ThemePreference } from '$lib/theme-store.js';
+	import { cards } from '$lib/stores.js';
+	import { getAllDueCards } from '$lib/review-session.js';
+	import { touchVault } from '$lib/secret-vault.js';
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import logoMark from '$lib/assets/logo-mark.svg';
@@ -15,7 +18,8 @@
 		{ href: '/', label: m['nav.home']() },
 		{ href: '/stats', label: m['nav.stats']() },
 		{ href: '/tutorial', label: m['nav.tutorial']() },
-		{ href: '/settings/ai', label: m['nav.ai']() }
+		{ href: '/settings/ai', label: m['nav.ai']() },
+		{ href: '/settings/sync', label: m['nav.sync']() }
 	]);
 
 	let pathname = $derived(page.url.pathname);
@@ -25,6 +29,17 @@
 	}
 
 	let locale = $state(getLocale());
+
+	$effect(() => {
+		if (typeof window === 'undefined') return;
+		const onActivity = () => touchVault();
+		window.addEventListener('pointerdown', onActivity, { passive: true });
+		window.addEventListener('keydown', onActivity);
+		return () => {
+			window.removeEventListener('pointerdown', onActivity);
+			window.removeEventListener('keydown', onActivity);
+		};
+	});
 
 	$effect(() => {
 		const unsub = themePreference.subscribe((pref) => {
@@ -38,7 +53,10 @@
 		const mq = window.matchMedia('(prefers-color-scheme: dark)');
 		const handler = () => {
 			let current: ThemePreference = 'auto';
-			const unsub = themePreference.subscribe((v) => { current = v; unsub(); });
+			const unsub = themePreference.subscribe((v) => {
+				current = v;
+				unsub();
+			});
 			if (current === 'auto') applyTheme('auto');
 		};
 		mq.addEventListener('change', handler);
@@ -50,9 +68,20 @@
 		document.documentElement.lang = locale;
 		document.documentElement.dir = rtlLocales[locale] ? 'rtl' : 'ltr';
 	});
+	$effect(() => {
+		if (typeof window === 'undefined' || !('setAppBadge' in navigator)) return;
+		const now = new Date();
+		const dueCount = getAllDueCards($cards, now).length;
+		if (dueCount > 0) {
+			navigator.setAppBadge(dueCount).catch(() => {});
+		} else {
+			navigator.clearAppBadge().catch(() => {});
+		}
+	});
 
 	function cycleTheme() {
-		const next: ThemePreference = $themePreference === 'auto' ? 'light' : $themePreference === 'light' ? 'dark' : 'auto';
+		const next: ThemePreference =
+			$themePreference === 'auto' ? 'light' : $themePreference === 'light' ? 'dark' : 'auto';
 		themePreference.set(next);
 		applyTheme(next);
 	}
@@ -72,14 +101,39 @@
 	<link rel="icon" href={favicon} />
 	<title>KaadoNeuro</title>
 	<script>
-		(function(){try{var t=JSON.parse(localStorage.getItem('kaadoneuro_theme')||'"auto"');if(t!=='auto'&&t!=='light'&&t!=='dark')t='auto';var r=t==='auto'?(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):t;document.documentElement.setAttribute('data-theme',r);}catch(e){}})();
+		(function () {
+			try {
+				var t = JSON.parse(localStorage.getItem('kaadoneuro_theme') || '"auto"');
+				if (t !== 'auto' && t !== 'light' && t !== 'dark') t = 'auto';
+				var r =
+					t === 'auto'
+						? window.matchMedia('(prefers-color-scheme:dark)').matches
+							? 'dark'
+							: 'light'
+						: t;
+				document.documentElement.setAttribute('data-theme', r);
+			} catch (e) {}
+		})();
 	</script>
 </svelte:head>
 
-<header class="sticky top-0 z-30 border-b border-border/70 bg-[color-mix(in_oklch,var(--bg)_92%,transparent)] backdrop-blur-[14px]">
+<header
+	class="sticky top-0 z-30 border-b border-border/70 bg-[color-mix(in_oklch,var(--bg)_92%,transparent)] backdrop-blur-[14px]"
+>
 	<div class="container mx-auto flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 sm:px-6">
-		<a href="/" class="flex items-center gap-2.5 font-display text-[22px] tracking-[-0.02em]" aria-label={m['brand.home']()}>
-			<img src={logoMark} alt="" width="32" height="32" class="size-8 shrink-0" aria-hidden="true" />
+		<a
+			href="/"
+			class="flex items-center gap-2.5 font-display text-[22px] tracking-[-0.02em]"
+			aria-label={m['brand.home']()}
+		>
+			<img
+				src={logoMark}
+				alt=""
+				width="32"
+				height="32"
+				class="size-8 shrink-0"
+				aria-hidden="true"
+			/>
 			<span>KaadoNeuro</span>
 		</a>
 		<nav
@@ -90,7 +144,7 @@
 				<a
 					href={item.href}
 					aria-current={isActive(item.href) ? 'page' : undefined}
-					class="shrink-0 border-b-2 px-2.5 py-2 font-mono text-[11px] font-bold uppercase tracking-[0.08em] transition-colors {isActive(
+					class="shrink-0 border-b-2 px-2.5 py-2 font-mono text-[11px] font-bold tracking-[0.08em] uppercase transition-colors {isActive(
 						item.href
 					)
 						? 'border-[var(--accent-text)] text-accent'

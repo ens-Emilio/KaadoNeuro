@@ -63,9 +63,9 @@ describe('processReview', () => {
 
 	it('lança erro para qualidade fora do intervalo 0-5', () => {
 		const card = makeCard();
-		expect(() => processReview(card, -1, () => 'x')).toThrow(/Qualidade inválida/);
-		expect(() => processReview(card, 6, () => 'x')).toThrow(/Qualidade inválida/);
-		expect(() => processReview(card, 2.5, () => 'x')).toThrow(/Qualidade inválida/);
+		expect(() => processReview(card, -1, () => 'x')).toThrow(/Invalid quality/);
+		expect(() => processReview(card, 6, () => 'x')).toThrow(/Invalid quality/);
+		expect(() => processReview(card, 2.5, () => 'x')).toThrow(/Invalid quality/);
 	});
 });
 
@@ -107,7 +107,12 @@ describe('getDueCards', () => {
 		const cards: Flashcard[] = [
 			makeCard({ id: '1', deckId: 'd1', dueDate: '2026-01-14T00:00:00Z', tags: ['math'] }),
 			makeCard({ id: '2', deckId: 'd1', dueDate: '2026-01-14T00:00:00Z', tags: ['science'] }),
-			makeCard({ id: '3', deckId: 'd1', dueDate: '2026-01-14T00:00:00Z', tags: ['math', 'science'] }),
+			makeCard({
+				id: '3',
+				deckId: 'd1',
+				dueDate: '2026-01-14T00:00:00Z',
+				tags: ['math', 'science']
+			}),
 			makeCard({ id: '4', deckId: 'd1', dueDate: '2026-01-14T00:00:00Z', tags: [] })
 		];
 

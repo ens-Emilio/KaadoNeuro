@@ -2,7 +2,7 @@
  * Lógica pura da sessão de review, extraída do componente para ser testável.
  * Não depende de Svelte, DOM ou stores — recebe dados e retorna novos estados.
  */
-import type { Flashcard, ReviewLog } from './types.js';
+import type { Flashcard, ReviewLog, Deck } from './types.js';
 import { calculateReview } from './sm2.js';
 
 export interface ReviewResult {
@@ -21,13 +21,14 @@ export interface ReviewResult {
 export function processReview(
 	card: Flashcard,
 	quality: number,
-	generateId: () => string
+	generateId: () => string,
+	overrides?: Deck['sm2Overrides']
 ): ReviewResult {
 	if (quality < 0 || quality > 5 || !Number.isInteger(quality)) {
-		throw new Error(`Qualidade inválida: ${quality}. Deve ser inteiro entre 0 e 5.`);
+		throw new Error(`Invalid quality: ${quality}. Expected an integer from 0 to 5.`);
 	}
 
-	const updatedFields = calculateReview(card, quality);
+	const updatedFields = calculateReview(card, quality, overrides);
 	const updatedCard: Flashcard = { ...card, ...updatedFields };
 
 	const newLog: ReviewLog = {
@@ -44,7 +45,12 @@ export function processReview(
  * Filtra e ordena cards vencidos para um deck específico.
  * Retorna array ordenado por dueDate ascendente (mais urgente primeiro).
  */
-export function getDueCards(cards: Flashcard[], deckId: string, now: Date = new Date(), activeTags: string[] = []): Flashcard[] {
+export function getDueCards(
+	cards: Flashcard[],
+	deckId: string,
+	now: Date = new Date(),
+	activeTags: string[] = []
+): Flashcard[] {
 	return cards
 		.filter((c) => {
 			if (c.deckId !== deckId) return false;
@@ -79,7 +85,11 @@ export function applySessionLimit(cards: Flashcard[], limit: number): Flashcard[
  * Filtra e ordena cards vencidos de TODOS os decks.
  * Usado pela Revisão Rápida (Quick Review).
  */
-export function getAllDueCards(cards: Flashcard[], now: Date = new Date(), activeTags: string[] = []): Flashcard[] {
+export function getAllDueCards(
+	cards: Flashcard[],
+	now: Date = new Date(),
+	activeTags: string[] = []
+): Flashcard[] {
 	return cards
 		.filter((c) => {
 			if (new Date(c.dueDate) > now) return false;

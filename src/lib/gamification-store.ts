@@ -1,7 +1,7 @@
 import { derived } from 'svelte/store';
 import { persisted } from 'svelte-local-storage-store';
 import { z } from 'zod';
-import { reviewLogs, streak } from './stores.js';
+import { reviewLogs } from './stores.js';
 
 const XP_PER_CARD = 10;
 const STREAK_BONUS_XP = 50;
@@ -18,20 +18,24 @@ export type GamificationState = z.infer<typeof gamificationSchema>;
  * and the last date a streak bonus was claimed.
  * Base XP is always derived from reviewLogs to stay consistent.
  */
-export const gamification = persisted<GamificationState>('kaadoneuro_gamification', { bonusXp: 0 }, {
-	serializer: {
-		stringify: (value) => JSON.stringify(value),
-		parse: (raw) => {
-			try {
-				const parsed = JSON.parse(raw ?? '{}');
-				const result = gamificationSchema.safeParse(parsed);
-				return result.success ? result.data : { bonusXp: 0 };
-			} catch {
-				return { bonusXp: 0 };
+export const gamification = persisted<GamificationState>(
+	'kaadoneuro_gamification',
+	{ bonusXp: 0 },
+	{
+		serializer: {
+			stringify: (value) => JSON.stringify(value),
+			parse: (raw) => {
+				try {
+					const parsed = JSON.parse(raw ?? '{}');
+					const result = gamificationSchema.safeParse(parsed);
+					return result.success ? result.data : { bonusXp: 0 };
+				} catch {
+					return { bonusXp: 0 };
+				}
 			}
 		}
 	}
-});
+);
 
 /** Total XP = (review count × 10) + persisted bonus XP. */
 export const xp = derived(

@@ -14,7 +14,7 @@ The app can be installed as a PWA, used offline after the first visit, and hoste
 
 - **SM-2 spaced repetition**: review intervals based on recall quality.
 - **Decks and cards**: organize multiple subjects with a focused review flow.
-- **Bulk import**: import JSON, Markdown, or plain text.
+- **Bulk import**: import JSON, Markdown, plain text, or Anki `.apkg` packages.
 - **Statistics**: review volume, card counts, and SM-2 quality distribution.
 - **Editorial interface**: light and dark themes, responsive layout, and a calm visual system.
 - **13 languages**: Portuguese, English, Spanish, French, German, Simplified Chinese, Japanese, Korean, Arabic, Hindi, Indonesian, Turkish, and Vietnamese.
@@ -55,11 +55,14 @@ src/
 
 ## Run locally
 
-Requirements: Node.js 24 and npm.
+Requirements: Node.js **22.12 or newer** (validated on Node 24) and **pnpm 10**.
+
+The repository keeps only `pnpm-lock.yaml`; npm and Yarn installs do not reproduce the tested dependency set.
 
 ```bash
-npm ci
-npm run dev
+corepack enable
+pnpm install
+pnpm dev
 ```
 
 Open the local URL shown by Vite.
@@ -67,11 +70,18 @@ Open the local URL shown by Vite.
 ## Production build
 
 ```bash
-npm run build
-npm run preview
+pnpm build
+pnpm preview
 ```
 
 The static site is written to `build/`.
+
+Run checks with:
+
+```bash
+pnpm check
+pnpm test:unit -- --run
+```
 
 ## Hosting
 
@@ -85,17 +95,20 @@ See [DEPLOY.md](DEPLOY.md) for hosting details.
 
 In a deck, choose **Import** and use either:
 
-1. **File**: select `.json`, `.md`, or `.txt`.
+1. **File**: select `.json`, `.md`, `.txt`, or an Anki `.apkg`. An `.apkg` supplies the deck name, the field text (HTML converted), and the tags; notes without a back side are skipped and the count is reported in the preview.
 2. **Text**: paste content directly.
 
 Markdown format:
 
 ```markdown
 # Question
+
 Answer text
 Can span multiple lines.
 ---
+
 # Another question
+
 Another answer.
 ```
 
@@ -103,8 +116,8 @@ JSON format:
 
 ```json
 [
-  { "front": "Question", "back": "Answer" },
-  { "front": "Term", "back": "Definition" }
+	{ "front": "Question", "back": "Answer" },
+	{ "front": "Term", "back": "Definition" }
 ]
 ```
 
@@ -143,10 +156,10 @@ Limits:
 ## Tests and checks
 
 ```bash
-npm run test:unit -- --run
-npm run test:e2e
-npm run check
-npm run build
+pnpm test:unit -- --run
+pnpm test:e2e
+pnpm check
+pnpm build
 ```
 
 ## License

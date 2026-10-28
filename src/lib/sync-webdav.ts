@@ -50,7 +50,12 @@ export async function uploadSnapshot(
 			return { ok: false, error: 'Timeout: server did not respond in time.' };
 		}
 		if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
-			return { ok: false, cors: true, error: 'CORS or network error. If your WebDAV server does not allow browser requests, use a CORS proxy or a local sync tool.' };
+			return {
+				ok: false,
+				cors: true,
+				error:
+					'CORS or network error. If your WebDAV server does not allow browser requests, use a CORS proxy or a local sync tool.'
+			};
 		}
 		return { ok: false, error: err instanceof Error ? err.message : String(err) };
 	} finally {
@@ -80,7 +85,11 @@ export async function downloadSnapshot(
 
 		if (!res.ok) {
 			const detail = await res.text().catch(() => '');
-			return { ok: false, snapshot: null, error: `HTTP ${res.status}: ${detail || res.statusText}` };
+			return {
+				ok: false,
+				snapshot: null,
+				error: `HTTP ${res.status}: ${detail || res.statusText}`
+			};
 		}
 
 		const data = await res.json();
@@ -90,7 +99,13 @@ export async function downloadSnapshot(
 			return { ok: false, snapshot: null, error: 'Timeout: server did not respond in time.' };
 		}
 		if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
-			return { ok: false, snapshot: null, cors: true, error: 'CORS or network error. If your WebDAV server does not allow browser requests, use a CORS proxy or a local sync tool.' };
+			return {
+				ok: false,
+				snapshot: null,
+				cors: true,
+				error:
+					'CORS or network error. If your WebDAV server does not allow browser requests, use a CORS proxy or a local sync tool.'
+			};
 		}
 		return { ok: false, snapshot: null, error: err instanceof Error ? err.message : String(err) };
 	} finally {
@@ -128,7 +143,12 @@ export async function testConnection(url: string, user: string, pass: string): P
 			return { ok: false, error: 'Timeout: server did not respond in time.' };
 		}
 		if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
-			return { ok: false, cors: true, error: 'CORS or network error. If your WebDAV server does not allow browser requests, use a CORS proxy or a local sync tool.' };
+			return {
+				ok: false,
+				cors: true,
+				error:
+					'CORS or network error. If your WebDAV server does not allow browser requests, use a CORS proxy or a local sync tool.'
+			};
 		}
 		return { ok: false, error: err instanceof Error ? err.message : String(err) };
 	} finally {
