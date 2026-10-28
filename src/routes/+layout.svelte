@@ -56,6 +56,7 @@
 		const unsub = themePreference.subscribe((v) => { current = v; unsub(); });
 		const next: ThemePreference = current === 'auto' ? 'light' : current === 'light' ? 'dark' : 'auto';
 		themePreference.set(next);
+		applyTheme(next);
 	}
 
 	function changeLocale(e: Event) {
