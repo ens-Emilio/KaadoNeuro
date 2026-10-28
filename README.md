@@ -1,165 +1,198 @@
 # KaadoNeuro
 
-Português | [English](README.en.md) | [Español](README.es.md)
+English | [Português](README.pt-BR.md) | [Español](README.es.md)
 
-Aplicativo PWA de flashcards focado em simplicidade, com repetição espaçada SM-2 e funcionamento local-first.
+A local-first flashcard PWA built around focus, clarity, and the SM-2 spaced-repetition method.
 
-## 🚀 Visão Geral
+## Overview
 
-O **KaadoNeuro** é uma aplicação **Local-First**, o que significa que todos os seus dados (baralhos, cartões e progresso) são armazenados localmente no seu navegador (`localStorage`). Não há necessidade de login ou conexão constante com a internet para estudar.
+**KaadoNeuro** is a local-first study app. Decks, cards, review progress, preferences, and AI settings live in the browser. There is no account system, application server, or remote database.
 
-### Funcionalidades Principais
+The app installs as a PWA, works offline after the first visit, and ships as a static site.
 
-- **Algoritmo SM-2**: Implementação fiel do algoritmo SuperMemo 2 para calcular os intervalos ideais de revisão.
-- **Organização em Baralhos**: Crie múltiplos baralhos para separar seus tópicos de estudo.
-- **Importação Flexível**: Adicione cartões em massa via arquivo (JSON, Markdown, TXT ou pacote Anki `.apkg`) ou cole o texto diretamente.
-- **Gamificação**: Acompanhe seu progresso diário com o contador de "Streak" (dias consecutivos) e saudações dinâmicas (Bom dia/tarde/noite).
-- **Estatísticas**: Visualize o volume de estudos e a qualidade das suas revisões.
-- **PWA Completo**: Instale no seu dispositivo (celular ou desktop) e estude totalmente offline.
-- **Interface editorial**: temas claro e escuro, 13 idiomas e layout responsivo.
-- **IA opcional**: conecte seu próprio provider no navegador.
-- **Backup**: exportação e importação completas pelo próprio app.
+## Features
 
-## 🛠️ Stack Tecnológico
+- **SM-2 spaced repetition**: review intervals based on recall quality, with per-deck settings for initial interval, ease-factor modifier, and maximum interval.
+- **Decks and cards**: organize multiple subjects, filter by tag, and review due cards across every deck at once.
+- **Bulk import**: JSON, Markdown, plain text, or Anki `.apkg` packages, including `collection.anki21` compressed with Zstandard.
+- **Export**: Anki-compatible CSV and per-deck JSON.
+- **Cloze cards**: fill-in-the-blank prompts with answer checking.
+- **Text to speech**: read a card aloud with markup stripped.
+- **Pomodoro timer**: focus and break cycles alongside review.
+- **Statistics**: review volume, card counts, SM-2 quality distribution, and streak.
+- **Editorial interface**: light and dark themes, responsive layout, KaTeX math, and a calm visual system.
+- **13 languages**: Portuguese, English, Spanish, French, German, Simplified Chinese, Japanese, Korean, Arabic, Hindi, Indonesian, Turkish, and Vietnamese.
+- **Right-to-left support**: automatic RTL layout for Arabic.
+- **Optional AI**: connect your own provider and review generated cards before saving.
+- **Backup**: export and import complete local backups.
+- **Deck sharing**: send a deck as a link with a validated payload.
+- **WebDAV sync**: point the app at your own WebDAV server.
 
-- **Frontend**: [Svelte 5](https://svelte.dev/) + [SvelteKit](https://kit.svelte.dev/)
-- **Estilização**: [Tailwind CSS](https://tailwindcss.com/) + [shadcn-svelte](https://www.shadcn-svelte.com/)
-- **Persistência**: armazenamento local no dispositivo
-- **Distribuição**: build estático, PWA instalável e qualquer hospedagem de arquivos
-- **Ícones**: Lucide Icons
-- **Hospedagem**: qualquer host estático, ou execução local
+## Stack
 
-## 📂 Estrutura do Projeto
+- **Frontend**: Svelte 5 and SvelteKit
+- **Styling**: Tailwind CSS and shadcn-svelte components
+- **Persistence**: browser storage
+- **Distribution**: static build and installable PWA
+- **Icons**: Lucide
+- **AI runtime**: direct browser calls to the provider chosen by the user
+- **Anki import**: SQLite compiled to WebAssembly
 
-```
+## Project structure
+
+```text
 src/
 ├── lib/
-│   ├── components/     # Componentes de UI reutilizáveis (botões, cards, inputs, dialogs)
-│   ├── sm2.ts          # Lógica do algoritmo de repetição espaçada (SM-2)
-│   ├── stores.ts       # Gerenciamento de estado global e persistência (Decks, Cards, Logs)
-│   ├── types.ts        # Definições de tipos TypeScript (Flashcard, Deck, ReviewLog)
-│   └── utils.ts        # Funções utilitárias
+│   ├── ai/              # Provider presets, prompts, validation, browser client
+│   ├── components/      # Reusable UI, AI dialog, and review card
+│   ├── i18n/            # Locale names and RTL metadata
+│   ├── anki-export.ts   # Anki CSV export
+│   ├── apkg-import.ts   # Anki package reader
+│   ├── backup.ts        # Full JSON backup and restore
+│   ├── deck-share.ts    # Deck link payloads
+│   ├── secret-vault.ts  # Passphrase-protected credential vault
+│   ├── sm2.ts           # SM-2 algorithm
+│   ├── stores.ts        # Local decks, cards, and review logs
+│   ├── sync-webdav.ts   # WebDAV client
+│   └── types.ts
 ├── routes/
-│   ├── +page.svelte           # Dashboard (Lista de baralhos, Streak, Resumo)
-│   ├── decks/[id]/+page.svelte # Editor de Baralho (Adicionar/Remover/Importar cartões)
-│   ├── review/[deckId]/+page.svelte # Interface de Estudo (Frente/Verso, Avaliação)
-│   └── stats/+page.svelte      # Página de Estatísticas
-└── service-worker.ts   # Configuração PWA para funcionamento offline
+│   ├── +page.svelte
+│   ├── decks/[id]/+page.svelte
+│   ├── review/[deckId]/+page.svelte
+│   ├── review/quick/+page.svelte
+│   ├── settings/ai/+page.svelte
+│   ├── settings/sync/+page.svelte
+│   ├── stats/+page.svelte
+│   └── tutorial/+page.svelte
+└── service-worker.ts
 ```
 
-## 🧠 Como Funciona o Algoritmo SM-2
+## Run locally
 
-O arquivo `src/lib/sm2.ts` contém a lógica central. Quando você revisa um cartão:
+Requirements: Node.js **22.12 or newer** (validated on Node 24) and **pnpm 10**.
 
-1.  Você avalia sua memória de 0 (Apagão) a 5 (Perfeito).
-2.  O algoritmo calcula:
-    - **Intervalo**: Dias até a próxima revisão.
-    - **Fator de Facilidade (EF)**: Ajusta o quão rápido o intervalo cresce.
-    - **Repetições**: Contagem de acertos consecutivos.
+The repository keeps only `pnpm-lock.yaml`; npm and Yarn installs do not reproduce the tested dependency set.
 
-## 📦 Instalação e Execução
+```bash
+corepack enable
+pnpm install
+pnpm dev
+```
 
-Pré-requisitos: Node.js **22.12 ou superior** (o projeto foi validado em Node 24) e **pnpm 10**.
+Open the local URL shown by Vite.
 
-O repositório mantém apenas `pnpm-lock.yaml`; `npm install` e `yarn install` não reproduzem o conjunto de dependências testado.
+## Production build
 
-1.  **Instale as dependências**:
+```bash
+pnpm build
+pnpm preview
+```
 
-    ```bash
-    corepack enable
-    pnpm install
-    ```
+The static site is written to `build/`.
 
-2.  **Inicie o servidor de desenvolvimento**:
+Run checks with:
 
-    ```bash
-    pnpm dev
-    ```
+```bash
+pnpm check
+pnpm test:unit -- --run
+```
 
-3.  **Build para produção**:
+## Hosting
 
-    ```bash
-    pnpm build
-    pnpm preview
-    ```
+Publish the contents of `build/` to any static host with HTTPS, such as GitHub Pages, Cloudflare Pages, Netlify, Vercel, nginx, or Caddy.
 
-4.  **Verificações**:
-    ```bash
-    pnpm check
-    pnpm test:unit -- --run
-    ```
+The current architecture needs no VPS, application server, PostgreSQL instance, account backend, or billing service.
 
-## 📤 Importação de Cartões
+See [DEPLOY.md](DEPLOY.md) for hosting details.
 
-Dentro de um baralho, clique em **Importar** para abrir as opções:
+## Importing cards
 
-### 1. Aba Arquivo
+In a deck, choose **Import** and use either:
 
-Arraste ou selecione arquivos `.json`, `.md`, `.txt` ou pacotes Anki `.apkg`. Um `.apkg` traz o nome do baralho, o texto dos campos (HTML convertido) e as tags; notas sem verso são ignoradas e o total é informado na prévia.
+1. **File**: select `.json`, `.md`, `.txt`, or an Anki `.apkg`. An `.apkg` supplies the deck name, the field text (HTML converted), and the tags; notes without a back side are skipped and the count is reported in the preview.
+2. **Text**: paste content directly.
 
-### 2. Aba Texto
-
-Cole seu conteúdo diretamente. Ideal para notas rápidas ou copiar/colar do ChatGPT.
-O importador mostra uma prévia antes de salvar.
-
-**Formatos Aceitos:**
-
-**Texto/Markdown (Recomendado):**
-Separe os cartões com `---`. A primeira linha é a Frente, o resto é o Verso.
+Markdown format:
 
 ```markdown
-# Pergunta ou Frente do Cartão
+# Question
 
-Conteúdo da resposta ou verso.
-Pode ter múltiplas linhas.
+Answer text
+Can span multiple lines.
 ---
 
-# Próxima Pergunta
+# Another question
 
-Próxima resposta.
+Another answer.
 ```
 
-**JSON:**
+JSON format:
 
 ```json
 [
-	{ "front": "Pergunta", "back": "Resposta" },
-	{ "front": "Termo", "back": "Definição" }
+	{ "front": "Question", "back": "Answer" },
+	{ "front": "Term", "back": "Definition" }
 ]
 ```
 
-## Backup
+The importer shows a preview before saving.
 
-A seção **Backup dos seus dados** no Tutorial permite exportar e importar um arquivo JSON completo. Os dados ficam no navegador atual e não há sincronização entre dispositivos.
+## AI configuration
 
-## Configuração de IA
+Open **AI** in the navigation or `/settings/ai`.
 
-Acesse **IA** na navegação principal ou `/settings/ai` para conectar um provedor próprio e conferir os modelos disponíveis.
-
-Providers disponíveis:
+Supported providers:
 
 - Anthropic
 - OpenAI
 - Google Gemini
 - OpenRouter
-- OpenAI-compatible, com URL base própria
+- OpenAI-compatible endpoints, including self-hosted gateways
 
-A requisição é feita diretamente pelo navegador. A chave fica no armazenamento local deste dispositivo e só é enviada ao provider escolhido. Não informe uma chave em um site cujo operador ou host você não confia.
+The provider request is made directly from the browser. The key is stored in this browser's local storage and is sent only to the selected provider. Do not enter a key on a site whose operator or host you do not trust.
 
-O fluxo de geração mostra uma prévia editável antes de gravar. Nenhum baralho ou cartão é salvo sem confirmação.
+The AI flow produces an editable proposal. No deck or card is saved until you confirm **Apply**.
 
-### Limites
+Limits:
 
-- até 30 cartões por lote;
-- até 12.000 caracteres de contexto por geração;
-- resposta em formato JSON validada antes de aparecer na prévia.
+- up to 30 cards per batch;
+- up to 12,000 characters of source context;
+- JSON-shaped responses validated before display.
 
-### Segurança
+## Credential vault
 
-- a chave não entra em URL, log ou telemetria;
-- providers compatíveis remotos exigem HTTPS;
-- HTTP sem TLS é aceito somente em `localhost` e `127.0.0.1`.
+The AI key and the WebDAV password are stored in a vault protected by a passphrase:
+
+- PBKDF2-SHA-256 with 310,000 iterations and a random 16-byte salt;
+- AES-256-GCM with a random 12-byte IV;
+- the passphrase is never persisted;
+- the vault locks after 15 minutes of inactivity, or immediately through **Lock now**;
+- a page reload requires the passphrase again.
+
+See [SECURITY.md](SECURITY.md) for the full model.
+
+## Backup and privacy
+
+- Local data is tied to the current browser profile and origin.
+- Clearing browser site data removes decks, cards, and settings.
+- Use **Tutorial → Backup** to export or import a full JSON file.
+- There is no account recovery or automatic cross-device synchronization.
+- WebDAV sync needs the remote server to allow CORS.
+- Prompts are sent only to the provider configured by the user.
+
+## Tests and checks
+
+```bash
+pnpm test:unit -- --run
+pnpm test:e2e
+pnpm check
+pnpm build
+```
+
+## License
+
+Code is licensed under the [Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for attribution and the trademark policy.
 
 ---
 
-_Desenvolvido por **ens-Emilio** com foco em performance e simplicidade._
+Built by **ens-Emilio** with a focus on performance and simplicity.

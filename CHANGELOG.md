@@ -1,51 +1,57 @@
 # Changelog
 
-Todas as mudanças relevantes deste projeto são registradas aqui.
+All notable changes to this project are recorded here.
 
-O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o projeto usa [Versionamento Semântico](https://semver.org/lang/pt-BR/).
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+### Changed
+
+- Documentation is now English by default. `README.md` is the canonical README, `README.pt-BR.md` holds the Portuguese version, `README.es.md` holds the Spanish one, and `README.en.md` was removed as a duplicate.
 
 ## [1.0.0] - 2026-10-28
 
-Primeira versão publicada. O app é estático e local-first: roda no navegador, sem backend, conta ou banco remoto.
+First published version. The app is static and local-first: it runs in the browser with no backend, account, or remote database.
 
-### Adicionado
+### Added
 
-- Cofre local de credenciais com PBKDF2-SHA-256 (310.000 iterações) e AES-256-GCM, protegendo a chave de IA e a senha WebDAV. Bloqueio automático após 15 minutos sem atividade.
-- Compartilhamento de baralho por link, com payload validado por Zod, limite de 100 cartões e geração de novos IDs na importação.
-- Importação de pacotes Anki `.apkg`, incluindo `collection.anki21` comprimido com Zstandard, leitura via SQLite em WebAssembly, conversão de HTML e preservação de tags.
-- Exportação para Anki em CSV.
-- Leitura em voz alta do cartão (TTS) com o texto sem marcação.
-- Cartões cloze com campo de resposta e conferência.
-- Badge de app com o número de cartões devidos.
-- Modo Pomodoro com ciclos de foco e pausa.
-- Página de sincronização WebDAV (`/settings/sync`).
-- Filtros por tag, incluindo revisão cruzada entre baralhos.
-- Parâmetros SM-2 por baralho: intervalo inicial, modificador de EF e intervalo máximo.
-- Suporte a KaTeX no renderizador Markdown.
+- Local credential vault with PBKDF2-SHA-256 (310,000 iterations) and AES-256-GCM, protecting the AI key and the WebDAV password. Automatic lock after 15 minutes of inactivity.
+- Deck sharing by link, with a Zod-validated payload, a 100-card limit, and new IDs generated on import.
+- Anki `.apkg` import, including `collection.anki21` compressed with Zstandard, read through SQLite in WebAssembly, with HTML conversion and tag preservation.
+- Export to Anki CSV.
+- Read-aloud (TTS) for cards, with markup stripped.
+- Cloze cards with an answer field and checking.
+- App badge showing the number of due cards.
+- Pomodoro mode with focus and break cycles.
+- WebDAV synchronization page (`/settings/sync`).
+- Tag filters, including cross-deck review.
+- Per-deck SM-2 settings: initial interval, EF modifier, and maximum interval.
+- KaTeX support in the Markdown renderer.
 
-### Segurança
+### Security
 
-- Content Security Policy aplicada por header no servidor e por `<meta>` no build estático, com `wasm-unsafe-eval` restrito ao necessário para o importador Anki.
-- Sanitização de HTML renderizado com DOMPurify.
-- `connect-src` limitado a HTTPS e loopback, acompanhando o requisito de TLS do cliente de IA.
+- Content Security Policy applied through a server header and a `<meta>` tag in the static build, with `wasm-unsafe-eval` limited to what the Anki importer needs.
+- Rendered HTML sanitized with DOMPurify.
+- `connect-src` limited to HTTPS and loopback, matching the TLS requirement of the AI client.
 
-### Alterado
+### Changed
 
-- Stores migrados para uma implementação própria de armazenamento persistente, removendo a dependência de comportamento reativo de `svelte-local-storage-store`.
-- Service worker passa a pré-cachear o app shell e os assets referenciados, deixando chunks de rotas não visitadas para carregamento sob demanda.
-- Documentação de instalação padronizada em pnpm 10 e Node.js 22.12 ou superior.
+- Stores migrated to a custom persistent-storage implementation, removing the dependency on the reactive behavior of `svelte-local-storage-store`.
+- The service worker now pre-caches the app shell and referenced assets, leaving chunks of unvisited routes to load on demand.
+- Installation documentation standardized on pnpm 10 and Node.js 22.12 or newer.
 
-### Removido
+### Removed
 
-- `package-lock.json` e `yarn.lock`, mantendo apenas `pnpm-lock.yaml` como fonte de dependências.
-- `.env` órfão, herdado de um scaffold com Drizzle e Better Auth que o projeto não usa.
-- `crypto-utils.ts`, substituído pelo cofre de credenciais.
+- `package-lock.json` and `yarn.lock`, keeping `pnpm-lock.yaml` as the dependency source.
+- Orphan `.env` inherited from a scaffold with Drizzle and Better Auth that the project does not use.
+- `crypto-utils.ts`, replaced by the credential vault.
 
-### Limitações conhecidas
+### Known limitations
 
-- Não há backend de conta, recuperação de senha nem sincronização automática entre dispositivos.
-- A sincronização WebDAV depende de o servidor remoto permitir CORS.
-- Geração de cartões a partir de imagem (OCR) não está implementada.
-- Os dados vivem no navegador: limpar os dados do site apaga baralhos, cartões e o cofre.
+- No account backend, password recovery, or automatic synchronization between devices.
+- WebDAV synchronization depends on the remote server allowing CORS.
+- Image-to-card generation (OCR) is not implemented.
+- Data lives in the browser: clearing site data erases decks, cards, and the vault.
 
 [1.0.0]: https://github.com/ens-Emilio/KaadoNeuro/releases/tag/v1.0.0

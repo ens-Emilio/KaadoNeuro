@@ -1,6 +1,6 @@
 # KaadoNeuro
 
-[Português](README.md) | [English](README.en.md) | Español
+[English](README.md) | [Português](README.pt-BR.md) | Español
 
 Una PWA de tarjetas de estudio local-first centrada en concentración, claridad y el método de repetición espaciada SM-2.
 

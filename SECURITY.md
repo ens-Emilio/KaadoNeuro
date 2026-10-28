@@ -1,64 +1,64 @@
-# Segurança
+# Security
 
-## Modelo
+## Model
 
-O KaadoNeuro é uma aplicação estática/local-first. Não há servidor da aplicação, banco remoto, contas ou backend de IA.
+KaadoNeuro is a static, local-first application. There is no application server, remote database, account system, or AI backend.
 
-- baralhos, cartões e progresso ficam no armazenamento do navegador;
-- a chave de IA é usada diretamente pelo navegador para chamar o provider escolhido;
-- não envie uma chave de IA em um site hospedado por terceiros sem confiar no operador e no host.
+- decks, cards, and progress stay in browser storage;
+- the AI key is used directly by the browser to call the chosen provider;
+- do not enter an AI key on a site hosted by a third party unless you trust the operator and the host.
 
-## Cofre local de credenciais
+## Local credential vault
 
-A chave de IA e a senha WebDAV são guardadas em um cofre protegido por frase-senha:
+The AI key and the WebDAV password are kept in a vault protected by a passphrase:
 
-- formato atual: `enc:v3:sal.iv.ciphertext`;
-- derivação: PBKDF2-SHA-256, 310.000 iterações e salt aleatório de 16 bytes;
-- cifra: AES-256-GCM com IV aleatório de 12 bytes;
-- a frase-senha nunca é persistida;
-- a chave derivada existe somente na memória do módulo;
-- o cofre bloqueia após 15 minutos sem atividade ou pelo botão **Bloquear agora**;
-- uma recarga da página exige nova frase-senha;
-- os formulários não recuperam o segredo salvo; para substituir uma credencial, basta digitá-la novamente.
+- current format: `enc:v3:salt.iv.ciphertext`;
+- derivation: PBKDF2-SHA-256, 310,000 iterations, random 16-byte salt;
+- cipher: AES-256-GCM with a random 12-byte IV;
+- the passphrase is never persisted;
+- the derived key exists only in module memory;
+- the vault locks after 15 minutes of inactivity, or through the **Lock now** button;
+- a page reload requires the passphrase again;
+- the forms do not recover the stored secret; to replace a credential, type it again.
 
-Valores antigos `enc:v1` e `enc:v2` usavam outra chave e não podem ser migrados sem a chave anterior. A interface sinaliza o formato legado e pede a credencial uma vez; o próximo salvamento grava `enc:v3`.
+Older `enc:v1` and `enc:v2` values used another key and cannot be migrated without the previous one. The interface flags the legacy format and asks for the credential once; the next save writes `enc:v3`.
 
-## Limite de segurança
+## Security boundary
 
-O cofre fecha o acesso às credenciais em repouso sem a frase-senha. Enquanto estiver desbloqueado, código JavaScript comprometido na mesma origem ainda pode solicitar uma operação autorizada. O CSP reduz a superfície de ataque, mas não elimina esse risco.
+The vault closes off access to credentials at rest without the passphrase. While it is unlocked, compromised JavaScript on the same origin can still request an authorized operation. CSP reduces the attack surface but does not remove that risk.
 
 ### Content Security Policy
 
-A política sai em dois lugares, e ambos precisam concordar:
+The policy is emitted in two places, and both must agree:
 
-- `src/hooks.server.ts` define o header em `dev` e `preview`;
-- `src/app.html` define a mesma política como `<meta>`, porque o build estático servido por nginx, Caddy ou equivalente não passa por hook nenhum.
+- `src/hooks.server.ts` sets the header in `dev` and `preview`;
+- `src/app.html` sets the same policy as a `<meta>` tag, because a static build served by nginx, Caddy, or an equivalent never passes through a hook.
 
-Diretivas relevantes:
+Relevant directives:
 
-- `script-src` inclui `'wasm-unsafe-eval'`, exigido pelo `sql.js` que lê pacotes `.apkg`. Isso habilita compilação WebAssembly, não `eval` de JavaScript.
-- `connect-src` aceita `https:` e `localhost`/`127.0.0.1`, porque um provider compatível com OpenAI é configurado pelo usuário e o cliente exige HTTPS fora do loopback.
-- `frame-ancestors` só vale como header; no `<meta>` ele é ignorado pelo navegador, então `X-Frame-Options` continua sendo a proteção efetiva ali.
+- `script-src` includes `'wasm-unsafe-eval'`, required by the `sql.js` build that reads `.apkg` packages. This enables WebAssembly compilation, not JavaScript `eval`.
+- `connect-src` accepts `https:` and `localhost`/`127.0.0.1`, because the user configures an OpenAI-compatible provider and the client requires HTTPS outside loopback.
+- `frame-ancestors` only applies as a header; browsers ignore it in a `<meta>` tag, so `X-Frame-Options` remains the effective protection there.
 
-Se você publica o `build/` atrás de um servidor, prefira remover o `<meta>` e enviar a política como header, onde todas as diretivas valem.
+If you publish `build/` behind a server, prefer removing the `<meta>` tag and sending the policy as a header, where every directive applies.
 
-O contrato opcional `SecretProvider` em `src/lib/secret-vault.ts` permite que uma futura casca desktop guarde e use o segredo fora da página:
+The optional `SecretProvider` contract in `src/lib/secret-vault.ts` lets a future desktop shell store and use the secret outside the page:
 
-- o processo nativo acessa Keychain (macOS), Credential Manager (Windows) ou libsecret (Linux);
-- o processo da página recebe apenas o resultado da operação, como listar modelos, testar conexão ou gerar cartões;
-- a API key e a senha WebDAV nunca atravessam a bridge para a página.
+- the native process reaches Keychain (macOS), Credential Manager (Windows), or libsecret (Linux);
+- the page process receives only the result of the operation, such as listing models, testing a connection, or generating cards;
+- the API key and the WebDAV password never cross the bridge into the page.
 
-O projeto atual é um SPA com `@sveltejs/adapter-static`; essa proteção só se torna efetiva quando existir uma aplicação desktop que implemente o contrato e distribua assinada e atualizada.
+The current project is an SPA built with `@sveltejs/adapter-static`; that protection only takes effect once a desktop application implements the contract and ships signed and updated.
 
-## Reportar vulnerabilidades
+## Reporting vulnerabilities
 
-Não abra uma issue pública com detalhes exploráveis. Envie ao mantenedor um relatório privado com versão/commit, passos de reprodução, impacto e mitigação sugerida.
+Do not open a public issue with exploitable details. Send the maintainer a private report with the version or commit, reproduction steps, impact, and a suggested mitigation.
 
-## Recomendações
+## Recommendations
 
-- hospede por HTTPS;
-- mantenha o navegador atualizado;
-- faça backup dos dados;
-- revogue qualquer chave de IA que possa ter sido exposta;
-- limpar os dados do site remove todos os dados locais, incluindo o cofre;
-- depois de limpar os dados do site, crie um novo cofre e reinsira as credenciais.
+- host over HTTPS;
+- keep the browser up to date;
+- back up your data;
+- revoke any AI key that may have been exposed;
+- clearing site data removes all local data, including the vault;
+- after clearing site data, create a new vault and enter the credentials again.
