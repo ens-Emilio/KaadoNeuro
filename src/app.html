@@ -16,7 +16,7 @@
 			(function () {
 				var theme = 'light';
 				try {
-					var t = localStorage.getItem('kaadoneuro_theme');
+					var t = JSON.parse(localStorage.getItem('kaadoneuro_theme') || '"auto"');
 					if (t === 'dark' || t === 'light') theme = t;
 					else if (window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark';
 				} catch (e) {}
