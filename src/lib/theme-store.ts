@@ -1,9 +1,10 @@
-import { persisted } from 'svelte-local-storage-store';
+import { writable } from 'svelte/store';
 import { z } from 'zod';
 
 export type ThemePreference = 'auto' | 'light' | 'dark';
 
 const themeSchema = z.enum(['auto', 'light', 'dark']);
+const STORAGE_KEY = 'kaadoneuro_theme';
 
 function resolveTheme(pref: ThemePreference): 'light' | 'dark' {
 	if (pref !== 'auto') return pref;
@@ -16,12 +17,27 @@ export function applyTheme(pref: ThemePreference) {
 	document.documentElement.setAttribute('data-theme', resolved);
 }
 
-export const themePreference = persisted<ThemePreference>('kaadoneuro_theme', 'auto', {
-	serializer: {
-		stringify: (v) => JSON.stringify(v),
-		parse: (raw) => {
-			const result = themeSchema.safeParse(JSON.parse(raw ?? '"auto"'));
-			return result.success ? result.data : 'auto';
-		}
+function loadTheme(): ThemePreference {
+	if (typeof window === 'undefined') return 'auto';
+	try {
+		const raw = localStorage.getItem(STORAGE_KEY);
+		const result = themeSchema.safeParse(JSON.parse(raw ?? '"auto"'));
+		return result.success ? result.data : 'auto';
+	} catch {
+		return 'auto';
 	}
-});
+}
+
+function saveTheme(value: ThemePreference) {
+	if (typeof window === 'undefined') return;
+	try {
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+	} catch {}
+}
+
+export const themePreference = writable<ThemePreference>(loadTheme());
+
+// Subscribe to persist changes to localStorage
+if (typeof window !== 'undefined') {
+	themePreference.subscribe(saveTheme);
+}
