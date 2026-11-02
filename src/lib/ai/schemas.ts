@@ -30,6 +30,19 @@ export const AIProposalSchema = z.object({
 	cards: z.array(AICardSchema).min(1).max(30)
 });
 
+export const AIClozeCardSchema = z.object({
+	text: z.string().trim().min(1),
+	clozes: z.array(z.string().trim().min(1)).min(1)
+});
+
+export const AIClozeProposalSchema = z.object({
+	deckName: z.string().trim().min(1),
+	summary: z.string().trim().min(1),
+	cards: z.array(AIClozeCardSchema).min(1).max(10)
+});
+
+export type AIClozeProposalOutput = z.infer<typeof AIClozeProposalSchema>;
+
 export type AIConfigInput = z.infer<typeof AIConfigSchema>;
 export type AIGenerationRequestInput = z.infer<typeof AIGenerationRequestSchema>;
 export type AIProposalOutput = z.infer<typeof AIProposalSchema>;

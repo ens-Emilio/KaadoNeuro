@@ -151,3 +151,34 @@ describe('AIProposalSchema', () => {
 		expect(result.success).toBe(false);
 	});
 });
+describe('buildGenerationPrompt multimodal', () => {
+	it('returns text string when no image provided', () => {
+		const prompt = buildGenerationPrompt({ kind: 'deck', source: 'Test', count: 10 });
+		expect(typeof prompt).toBe('string');
+	});
+
+	it('returns content array with image when imageBase64 provided', () => {
+		const prompt = buildGenerationPrompt({
+			kind: 'cards',
+			source: 'Test',
+			count: 10,
+			imageBase64: 'data:image/png;base64,abc123'
+		});
+		expect(Array.isArray(prompt)).toBe(true);
+		const arr = prompt as Array<{ type: string }>;
+		expect(arr.length).toBe(2);
+		expect(arr[0].type).toBe('text');
+		expect(arr[1].type).toBe('image_url');
+	});
+
+	it('includes image analysis instruction in text part', () => {
+		const prompt = buildGenerationPrompt({
+			kind: 'deck',
+			source: 'Bio',
+			count: 10,
+			imageBase64: 'data:image/png;base64,x'
+		});
+		const arr = prompt as Array<{ type: string; text?: string }>;
+		expect(arr[0].text).toContain('Analise a imagem');
+	});
+});

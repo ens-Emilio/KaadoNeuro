@@ -5,6 +5,7 @@
 @custom-variant dark (&:is(.dark *, [data-theme="dark"] *));
 
 :root {
+	--font-scale: 100%;
 	--bg: #f2efe9;
 	--surface: #fbf9f5;
 	--fg: #18181b;
@@ -170,6 +171,7 @@
 		color-scheme: dark;
 	}
 	body {
+		font-size: var(--font-scale);
 		@apply bg-background text-foreground;
 		font-family: var(--font-body);
 		-webkit-font-smoothing: antialiased;

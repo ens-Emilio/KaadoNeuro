@@ -62,6 +62,7 @@
 				</p>
 				<form
 					class="mt-3 flex max-w-md flex-col gap-2"
+					novalidate
 					onsubmit={(event) => {
 						event.preventDefault();
 						void submit();
@@ -73,7 +74,6 @@
 						type="password"
 						autocomplete="current-password"
 						bind:value={passphrase}
-						minlength={12}
 						required
 					/>
 					{#if $vaultState.status === 'uninitialized'}
@@ -83,7 +83,6 @@
 							type="password"
 							autocomplete="new-password"
 							bind:value={confirmPassphrase}
-							minlength={12}
 							required
 						/>
 					{/if}

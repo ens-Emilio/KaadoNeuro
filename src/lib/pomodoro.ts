@@ -11,6 +11,8 @@ export interface PomodoroState {
 	completedWorkSessions: number;
 	/** Whether timer is paused (only meaningful when phase !== 'idle') */
 	paused: boolean;
+	/** True when forced long break is active; blocks new work sessions */
+	inLongBreak: boolean;
 }
 
 export const DURATIONS = {
@@ -23,15 +25,19 @@ export const INITIAL_STATE: PomodoroState = {
 	phase: 'idle',
 	timeRemaining: 0,
 	completedWorkSessions: 0,
-	paused: false
+	paused: false,
+	inLongBreak: false
 };
 
 export function startWork(state: PomodoroState): PomodoroState {
+	// Block starting work if forced long break is active
+	if (state.inLongBreak) return state;
 	return {
 		...state,
 		phase: 'work',
 		timeRemaining: DURATIONS.work,
-		paused: false
+		paused: false,
+		inLongBreak: false
 	};
 }
 
@@ -70,14 +76,16 @@ export function tick(state: PomodoroState, elapsedMs: number): PomodoroState | n
 					phase: 'longBreak',
 					timeRemaining: DURATIONS.longBreak,
 					completedWorkSessions: completed,
-					paused: false
+					paused: false,
+					inLongBreak: true
 				};
 			}
 			return {
 				phase: 'shortBreak',
 				timeRemaining: DURATIONS.shortBreak,
 				completedWorkSessions: completed,
-				paused: false
+				paused: false,
+				inLongBreak: false
 			};
 		}
 		case 'shortBreak':
@@ -85,14 +93,16 @@ export function tick(state: PomodoroState, elapsedMs: number): PomodoroState | n
 				phase: 'work',
 				timeRemaining: DURATIONS.work,
 				completedWorkSessions: state.completedWorkSessions,
-				paused: false
+				paused: false,
+				inLongBreak: false
 			};
 		case 'longBreak':
 			return {
 				phase: 'idle',
 				timeRemaining: 0,
 				completedWorkSessions: 0,
-				paused: false
+				paused: false,
+				inLongBreak: false
 			};
 		default:
 			return null;

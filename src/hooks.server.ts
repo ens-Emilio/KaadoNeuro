@@ -18,7 +18,7 @@ const security: Handle = async ({ event, resolve }) => {
 		// HTTPS (client.ts enforces it); localhost stays reachable for self-hosted
 		// models during development.
 		"connect-src 'self' https: http://localhost:* http://127.0.0.1:*",
-		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+		"style-src 'self' 'unsafe-inline'",
 		"img-src 'self' data: blob:",
 		"frame-ancestors 'none'"
 	].join('; ');

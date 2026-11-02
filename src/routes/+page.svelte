@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import { xp, level } from '$lib/gamification-store.js';
-	import { decks, cards, generateId, streak } from '$lib/stores.js';
-	import { goto } from '$app/navigation';
-	import { Plus, Play, Edit, Upload } from '@lucide/svelte';
+	import { decks, cards, generateId, streak, allTags, flatDecks } from '$lib/stores.js';
+	import { browser } from '$app/environment';
+	import { AlertCircle, Play, Plus, Upload, Edit } from '@lucide/svelte';
 	import { formatDateShort } from '$lib/import.js';
 	import { getLocale } from '$lib/paraglide/runtime.js';
 	import * as m from '$lib/paraglide/messages.js';
 	import AIGenerateLazy from '$lib/components/ai/ai-generate-lazy.svelte';
 	import { mergeDeckImport } from '$lib/deck-export.js';
 	import { MAX_IMPORT_BYTES } from '$lib/import.js';
-	import { allTags } from '$lib/stores.js';
+	import { countOverdueCards } from '$lib/review-session.js';
 	import { decodeDeckShare, SHARE_PARAM } from '$lib/deck-share.js';
 	import { importApkgFile } from '$lib/apkg-import.js';
 	import { page } from '$app/state';
@@ -19,7 +19,7 @@
 	// Só roda no cliente após hidratação para evitar flash durante SSR.
 	let hasCheckedOnboarding = false;
 	$effect(() => {
-		if (hasCheckedOnboarding || $decks.length > 0) return;
+		if (!browser || hasCheckedOnboarding || $decks.length > 0) return;
 		// A shared deck is about to be imported; onboarding would steal that arrival.
 		if (page.url.searchParams.get(SHARE_PARAM)) return;
 		hasCheckedOnboarding = true;
@@ -54,6 +54,7 @@
 				: m['home.greeting.evening']()
 	);
 	let dueTotal = $derived(getTotalDue());
+	let overdueTotal = $derived(countOverdueCards($cards, undefined, new Date()));
 	let nextDeck = $derived(
 		$decks
 			.map((deck) => ({ deck, due: getDueCount(deck.id) }))
@@ -64,10 +65,10 @@
 	let activeTagFilter = $state<string | null>(null);
 	let filteredDecks = $derived(
 		activeTagFilter
-			? $decks.filter((deck) =>
+			? $flatDecks.filter((deck) =>
 					$cards.some((c) => c.deckId === deck.id && c.tags.includes(activeTagFilter!))
 				)
-			: $decks
+			: $flatDecks
 	);
 	let importError = $state('');
 
@@ -232,6 +233,12 @@
 							{m['quickReview.start']()}
 						</Button>
 					{/if}
+					{#if overdueTotal > 0}
+						<Button href="/review/overdue" variant="outline" size="lg" class="gap-1.5">
+							<AlertCircle class="size-[18px] [stroke-width:1.75]" />
+							Overdue ({overdueTotal})
+						</Button>
+					{/if}
 				</div>
 			</div>
 
@@ -335,10 +342,24 @@
 			{:else}
 				<div class="mt-4 flex flex-col gap-2.5">
 					{#each filteredDecks as deck (deck.id)}
-						{@const due = getDueCount(deck.id)}
 						{@const total = $cards.filter((c) => c.deckId === deck.id).length}
+						{@const due = $cards.filter(
+							(c) => c.deckId === deck.id && new Date(c.dueDate) <= new Date()
+						).length}
 						{@const pending = due > 0}
+						{@const depth = (function () {
+							let d = 0;
+							let current = deck;
+							while (current.parentId && d < 10) {
+								const p = $decks.find((x) => x.id === current.parentId);
+								if (!p) break;
+								current = p;
+								d++;
+							}
+							return d;
+						})()}
 						<div
+							style="margin-left: {depth * 1.5}rem;"
 							class="group flex items-center gap-3 rounded-lg border bg-card px-4 py-3.5 transition-[border-color,box-shadow] duration-150 hover:shadow-[0_2px_12px_-5px_rgba(24,24,27,0.1)] sm:gap-4 {pending
 								? 'border-[color-mix(in_oklch,var(--accent-text)_34%,var(--border))]'
 								: 'border-border'}"

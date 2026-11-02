@@ -19,8 +19,9 @@ The app installs as a PWA, works offline after the first visit, and ships as a s
 - **Cloze cards**: fill-in-the-blank prompts with answer checking.
 - **Text to speech**: read a card aloud with markup stripped.
 - **Pomodoro timer**: focus and break cycles alongside review.
-- **Statistics**: review volume, card counts, SM-2 quality distribution, and streak.
-- **Editorial interface**: light and dark themes, responsive layout, KaTeX math, and a calm visual system.
+- **Statistics**: review volume, card counts, SM-2 quality distribution, streak, and predictive insights.
+- **Gamification**: 200+ achievements across 10 categories (streaks, reviews, mastery, speed, consistency, etc.).
+- **Editorial interface**: light/dark/system themes, custom dropdowns, responsive grid, KaTeX math, and a calm visual system.
 - **13 languages**: Portuguese, English, Spanish, French, German, Simplified Chinese, Japanese, Korean, Arabic, Hindi, Indonesian, Turkish, and Vietnamese.
 - **Right-to-left support**: automatic RTL layout for Arabic.
 - **Optional AI**: connect your own provider and review generated cards before saving.

@@ -20,6 +20,7 @@ export const deckSchema = z.object({
 	id: z.string().uuid(),
 	name: z.string().min(1),
 	description: z.string().optional(),
+	parentId: z.string().uuid().optional(),
 	createdAt: z.string().datetime()
 });
 

@@ -14,8 +14,10 @@
 	import VaultGate from '$lib/components/vault-gate.svelte';
 	import { testConnection, uploadSnapshot, downloadSnapshot } from '$lib/sync-webdav.js';
 	import { buildSnapshot, applySnapshot } from '$lib/backup.js';
-	import { CloudUpload, CloudDownload } from '@lucide/svelte';
+	import { detectConflict, resolveConflict, type MergeStrategy } from '$lib/sync-conflict.js';
+	import { CloudUpload, CloudDownload, AlertTriangle, Merge } from '@lucide/svelte';
 	import * as m from '$lib/paraglide/messages.js';
+	import type { Snapshot } from '$lib/snapshot-schema.js';
 
 	let url = $state($webdavConfig?.url ?? '');
 	let username = $state($webdavConfig?.username ?? '');
@@ -27,6 +29,7 @@
 		'idle'
 	);
 	let syncMessage = $state('');
+	let pendingRemoteSnapshot: Snapshot | null = $state(null);
 
 	$effect(() => {
 		const stored = $webdavConfig;
@@ -68,7 +71,7 @@
 		const stored = $webdavConfig;
 		if (!isConfigured(stored)) return;
 		syncStatus = 'uploading';
-		const snapshot = buildSnapshot();
+		const snapshot = await buildSnapshot();
 		const result = await withWebDavPassword(stored, (secret) =>
 			uploadSnapshot(stored.url, stored.username, secret, snapshot)
 		);
@@ -81,32 +84,88 @@
 		if (result.ok) await saveConfig(new Date().toISOString());
 	}
 
-	async function handleDownload(force = false) {
+	async function handleDownload() {
 		await saveConfig();
 		const stored = $webdavConfig;
 		if (!isConfigured(stored)) return;
 		syncStatus = 'downloading';
+		pendingRemoteSnapshot = null;
+
 		const result = await withWebDavPassword(stored, (secret) =>
 			downloadSnapshot(stored.url, stored.username, secret)
 		);
+
 		if (!result.ok) {
 			syncStatus = 'error';
 			syncMessage = result.cors ? m['sync.corsHint']() : (result.error ?? m['sync.testFail']());
 			return;
 		}
+
 		if (!result.snapshot) {
 			syncStatus = 'error';
 			syncMessage = m['sync.noRemote']();
 			return;
 		}
-		const localTs = $webdavConfig?.lastSyncAt ? new Date($webdavConfig.lastSyncAt).getTime() : 0;
-		const remoteTs = new Date(result.snapshot.exportedAt).getTime();
-		if (!force && localTs > remoteTs) {
+
+		const localSnapshot = await buildSnapshot();
+		const conflict = detectConflict(
+			$webdavConfig?.lastSyncAt,
+			localSnapshot.exportedAt,
+			result.snapshot.exportedAt
+		);
+
+		if (conflict.hasConflict) {
+			pendingRemoteSnapshot = result.snapshot;
 			syncStatus = 'conflict';
 			syncMessage = m['sync.conflict']();
 			return;
 		}
+
+		// No conflict: safe to apply remote
 		applySnapshot(result.snapshot);
+		syncStatus = 'success';
+		syncMessage = m['sync.downloadSuccess']();
+		await saveConfig(new Date().toISOString());
+	}
+
+	async function resolveSyncConflict(strategy: MergeStrategy) {
+		if (!pendingRemoteSnapshot) return;
+		const localSnapshot = await buildSnapshot();
+		const resolved = resolveConflict(localSnapshot, pendingRemoteSnapshot, strategy);
+
+		if (strategy === 'keepLocal') {
+			// Upload local as authoritative
+			const stored = $webdavConfig;
+			if (stored && isConfigured(stored)) {
+				syncStatus = 'uploading';
+				const result = await withWebDavPassword(stored, (secret) =>
+					uploadSnapshot(stored.url, stored.username, secret, resolved)
+				);
+				if (!result.ok) {
+					syncStatus = 'error';
+					syncMessage = result.cors ? m['sync.corsHint']() : (result.error ?? '');
+					return;
+				}
+			}
+		} else {
+			// Apply merged or remote-wins snapshot locally
+			applySnapshot(resolved);
+			// Also push resolved to remote so both sides converge
+			const stored = $webdavConfig;
+			if (stored && isConfigured(stored)) {
+				syncStatus = 'uploading';
+				const result = await withWebDavPassword(stored, (secret) =>
+					uploadSnapshot(stored.url, stored.username, secret, resolved)
+				);
+				if (!result.ok) {
+					syncStatus = 'error';
+					syncMessage = result.cors ? m['sync.corsHint']() : (result.error ?? '');
+					return;
+				}
+			}
+		}
+
+		pendingRemoteSnapshot = null;
 		syncStatus = 'success';
 		syncMessage = m['sync.downloadSuccess']();
 		await saveConfig(new Date().toISOString());
@@ -132,30 +191,34 @@
 			<div class="space-y-2">
 				<Label for="sync-url">{m['sync.url']()}</Label><Input
 					id="sync-url"
-					type="url"
 					bind:value={url}
+					placeholder="https://dav.example.com/remote.php/dav/files/user/"
 				/>
 			</div>
 			<div class="space-y-2">
 				<Label for="sync-user">{m['sync.username']()}</Label><Input
 					id="sync-user"
-					type="text"
 					bind:value={username}
+					autocomplete="username"
 				/>
 			</div>
 			<div class="space-y-2">
 				<Label for="sync-pass">{m['sync.password']()}</Label><Input
 					id="sync-pass"
 					type="password"
-					autocomplete="off"
 					bind:value={password}
+					autocomplete="new-password"
 				/>
 				<p class="text-xs text-muted-foreground">{m['vault.secretNotPrefilled']()}</p>
 			</div>
 			<div class="flex items-center gap-2">
-				<input id="sync-auto" type="checkbox" class="h-4 w-4" bind:checked={autoSync} /><Label
-					for="sync-auto">{m['sync.autoSync']()}</Label
-				>
+				<input
+					id="sync-auto"
+					type="checkbox"
+					bind:checked={autoSync}
+					class="size-4 rounded border-border accent-[var(--accent-solid)]"
+				/>
+				<Label for="sync-auto" class="font-normal">{m['sync.autoSync']()}</Label>
 			</div>
 			{#if testStatus !== 'idle'}<p role="status" aria-live="polite" class="text-sm">
 					{testMessage}
@@ -180,23 +243,69 @@
 					onclick={handleUpload}
 					disabled={syncStatus === 'uploading' ||
 						syncStatus === 'downloading' ||
+						syncStatus === 'conflict' ||
 						$vaultState.status !== 'unlocked'}
 					><CloudUpload class="mr-2 h-4 w-4" />{m['sync.upload']()}</Button
 				>
 				<Button
 					variant="outline"
-					onclick={() => handleDownload()}
+					onclick={handleDownload}
 					disabled={syncStatus === 'uploading' ||
 						syncStatus === 'downloading' ||
+						syncStatus === 'conflict' ||
 						$vaultState.status !== 'unlocked'}
 					><CloudDownload class="mr-2 h-4 w-4" />{m['sync.download']()}</Button
 				>
 			</div>
-			{#if syncStatus === 'conflict'}<Button
-					variant="destructive"
-					size="sm"
-					onclick={() => handleDownload(true)}>{m['sync.forceDownload']()}</Button
-				>{/if}
+			{#if syncStatus === 'conflict'}
+				<div
+					class="space-y-3 rounded-lg border border-[var(--q-dificil)]/30 bg-[color-mix(in_oklch,var(--q-dificil)_5%,transparent)] p-4"
+				>
+					<div class="flex items-start gap-2">
+						<AlertTriangle class="mt-0.5 size-4 shrink-0 text-[var(--q-dificil)]" />
+						<div class="space-y-1">
+							<p class="text-sm font-medium">{m['sync.conflict']}</p>
+							<p class="text-xs text-muted-foreground">
+								Local and remote data have both changed since the last sync. Choose how to resolve
+								this.
+							</p>
+						</div>
+					</div>
+					<div class="flex flex-wrap gap-2">
+						<Button
+							size="sm"
+							variant="outline"
+							onclick={() => resolveSyncConflict('keepLocal')}
+							disabled={$vaultState.status !== 'unlocked'}
+						>
+							<CloudUpload class="mr-1.5 size-3.5" />
+							Keep Local
+						</Button>
+						<Button
+							size="sm"
+							variant="outline"
+							onclick={() => resolveSyncConflict('keepRemote')}
+							disabled={$vaultState.status !== 'unlocked'}
+						>
+							<CloudDownload class="mr-1.5 size-3.5" />
+							Keep Remote
+						</Button>
+						<Button
+							size="sm"
+							onclick={() => resolveSyncConflict('merge')}
+							disabled={$vaultState.status !== 'unlocked'}
+						>
+							<Merge class="mr-1.5 size-3.5" />
+							Merge (newest cards win)
+						</Button>
+					</div>
+				</div>
+			{/if}
+			{#if $webdavConfig?.lastSyncAt}
+				<p class="text-xs text-muted-foreground">
+					{m['sync.lastSync']()}: {$webdavConfig.lastSyncAt}
+				</p>
+			{/if}
 		</Card.Content></Card.Root
 	>
 </div>

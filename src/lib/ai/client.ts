@@ -1,5 +1,5 @@
 import * as m from '$lib/paraglide/messages.js';
-import { parseAIProposal } from './prompt.js';
+import { parseAIProposal, parseAIClozeProposal } from './prompt.js';
 import type { AIConfig, AIProvider } from './types.js';
 import { AI_PROVIDER_PRESETS } from './types.js';
 
@@ -209,6 +209,10 @@ export async function listModels(config: AIConfig) {
 
 export async function generateProposal(config: AIConfig, prompt: PromptContent) {
 	return parseAIProposal(await request(config, prompt));
+}
+
+export async function generateClozeProposal(config: AIConfig, prompt: string) {
+	return parseAIClozeProposal(await request(config, prompt));
 }
 
 export function supportsVision(config: AIConfig): boolean {

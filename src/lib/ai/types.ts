@@ -1,6 +1,6 @@
 export type AIProvider = 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'compatible';
 
-export type AITask = 'deck' | 'cards';
+export type AITask = 'deck' | 'cards' | 'cloze';
 
 export interface AIConfig {
 	provider: AIProvider;
@@ -21,6 +21,18 @@ export interface AIProposal {
 	cards: AICardProposal[];
 }
 
+export interface AIClozeCardProposal {
+	text: string;
+	clozes: string[];
+}
+
+export interface AIClozeProposal {
+	kind: 'cloze';
+	deckName: string;
+	summary: string;
+	cards: AIClozeCardProposal[];
+}
+
 export interface AIGenerationInput {
 	kind: AITask;
 	source: string;
@@ -30,6 +42,8 @@ export interface AIGenerationInput {
 }
 
 export const AI_CARD_COUNTS = [10, 20, 30] as const;
+
+export const CLOZE_CARD_COUNTS = [3, 5, 8, 10] as const;
 
 export interface AIProviderPreset {
 	id: AIProvider;

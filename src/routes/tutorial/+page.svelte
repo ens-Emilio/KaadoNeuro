@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
-	import { ArrowLeft, BookOpen, Upload, Brain, FileText, Download } from '@lucide/svelte';
+	import { ArrowLeft, BookOpen, Upload, Brain, FileText, Download, Keyboard } from '@lucide/svelte';
 	import { downloadSnapshot, applySnapshot } from '$lib/backup.js';
 	import { MAX_IMPORT_BYTES } from '$lib/import.js';
 	import * as m from '$lib/paraglide/messages.js';
@@ -110,7 +110,44 @@
 						{m['tutorial.easyDesc']()}
 					</li>
 				</ul>
-				<p class="font-mono text-xs">{m['tutorial.shortcuts']()}</p>
+			</Card.Content>
+		</Card.Root>
+
+		<Card.Root class="rounded-lg">
+			<Card.Header>
+				<Card.Title class="flex items-center gap-2 text-sm">
+					<Keyboard class="size-[18px] [stroke-width:1.75] text-accent" />
+					{m['tutorial.shortcutsTitle']()}
+				</Card.Title>
+			</Card.Header>
+			<Card.Content class="space-y-3 text-sm text-muted-foreground">
+				<p>{m['tutorial.shortcutsIntro']()}</p>
+				<div class="grid gap-2 sm:grid-cols-2">
+					<div class="flex items-center justify-between rounded border bg-card px-3 py-2">
+						<span>{m['tutorial.shortcutSpace']()}</span>
+						<span class="font-mono text-xs">{m['tutorial.shortcutSpaceAction']()}</span>
+					</div>
+					<div class="flex items-center justify-between rounded border bg-card px-3 py-2">
+						<span>1</span>
+						<span class="font-mono text-xs">{m['tutorial.shortcut1Action']()}</span>
+					</div>
+					<div class="flex items-center justify-between rounded border bg-card px-3 py-2">
+						<span>2</span>
+						<span class="font-mono text-xs">{m['tutorial.shortcut2Action']()}</span>
+					</div>
+					<div class="flex items-center justify-between rounded border bg-card px-3 py-2">
+						<span>3</span>
+						<span class="font-mono text-xs">{m['tutorial.shortcut3Action']()}</span>
+					</div>
+					<div class="flex items-center justify-between rounded border bg-card px-3 py-2">
+						<span>4</span>
+						<span class="font-mono text-xs">{m['tutorial.shortcut4Action']()}</span>
+					</div>
+					<div class="flex items-center justify-between rounded border bg-card px-3 py-2">
+						<span>E</span>
+						<span class="font-mono text-xs">{m['tutorial.shortcutEAction']()}</span>
+					</div>
+				</div>
 			</Card.Content>
 		</Card.Root>
 

@@ -15,7 +15,8 @@ const pomodoroSchema = z.object({
 	phase: z.enum(['idle', 'work', 'shortBreak', 'longBreak']),
 	timeRemaining: z.number().nonnegative(),
 	completedWorkSessions: z.number().int().nonnegative(),
-	paused: z.boolean()
+	paused: z.boolean(),
+	inLongBreak: z.boolean()
 });
 
 function safeParse(raw: string | null): PomodoroState {
@@ -89,6 +90,7 @@ export const pomodoroPhase = derived(internal, ($s) => $s.phase);
 export const pomodoroTimeRemaining = derived(internal, ($s) => $s.timeRemaining);
 export const pomodoroPaused = derived(internal, ($s) => $s.paused);
 export const pomodoroCompletedSessions = derived(internal, ($s) => $s.completedWorkSessions);
+export const pomodoroInLongBreak = derived(internal, ($s) => $s.inLongBreak);
 
 /** Format mm:ss from milliseconds */
 export function formatPomodoroTime(ms: number): string {

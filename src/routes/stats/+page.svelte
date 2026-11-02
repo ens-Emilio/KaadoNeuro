@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { stats, heatmapData } from '$lib/stats-store.js';
+	import { stats, heatmapData, predictiveStats } from '$lib/stats-store.js';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import { ArrowLeft, BarChart2 } from '@lucide/svelte';
@@ -174,4 +174,61 @@
 			</Card.Content>
 		</Card.Root>
 	</div>
+
+	<Card.Root class="rounded-lg">
+		<Card.Header>
+			<Card.Title class="text-sm font-semibold">{m['stats.predictions']()}</Card.Title>
+			<Card.Description class="font-mono text-xs">{m['stats.predictionsDesc']()}</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+				<div class="space-y-1">
+					<p
+						class="font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
+					>
+						{m['stats.retentionAvg']()}
+					</p>
+					<div class="flex items-end gap-2">
+						<span class="font-display text-[26px] leading-none"
+							>{$predictiveStats.averageRetention.toFixed(0)}%</span
+						>
+					</div>
+					<div class="h-1.5 w-full overflow-hidden rounded-full bg-[var(--muted-surface)]">
+						<div
+							class="h-1.5 rounded-full bg-accent"
+							style="width: {$predictiveStats.averageRetention}%"
+						></div>
+					</div>
+				</div>
+				<div class="space-y-1">
+					<p
+						class="font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
+					>
+						{m['stats.reviewsNext7']()}
+					</p>
+					<div class="font-display text-[26px] leading-none">
+						{$predictiveStats.reviewsDueNext7Days}
+					</div>
+					<p class="text-[10px] text-muted-foreground">{m['stats.cardsDueNext']()}</p>
+				</div>
+				<div class="space-y-1">
+					<p
+						class="font-mono text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase"
+					>
+						{m['stats.currentStreak']()}
+					</p>
+					<div class="font-display text-[26px] leading-none">
+						{$predictiveStats.currentStreak}
+						<span class="text-base text-muted-foreground">{m['stats.days']()}</span>
+					</div>
+					<p class="text-[10px] text-muted-foreground">
+						{m['stats.record']({ days: $predictiveStats.longestStreak })}
+					</p>
+				</div>
+			</div>
+			<p class="mt-4 text-[10px] text-muted-foreground italic">
+				* {m['stats.predictionsDisclaimer']()}
+			</p>
+		</Card.Content>
+	</Card.Root>
 </div>

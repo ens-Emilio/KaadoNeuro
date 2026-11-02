@@ -2,6 +2,7 @@ import { derived } from 'svelte/store';
 import { decks, cards, reviewLogs } from './stores.js';
 import type { Deck, Flashcard, ReviewLog } from './types.js';
 import { clock, localDateKey } from './clock-store.js';
+import { computePredictiveStats } from './stats-predictive.js';
 
 export interface Stats {
 	totalDecks: number;
@@ -81,3 +82,14 @@ export const heatmapData = derived([reviewLogs, clock], ([$logs, $now]: [ReviewL
 	}
 	return days;
 });
+
+/**
+ * Predictive statistics derived store: forgetting curve retention,
+ * upcoming reviews, streaks. Updates when cards, logs, or clock change.
+ */
+export const predictiveStats = derived(
+	[cards, reviewLogs, clock],
+	([$cards, $logs, $now]: [Flashcard[], ReviewLog[], Date]) => {
+		return computePredictiveStats($cards, $logs, $now);
+	}
+);

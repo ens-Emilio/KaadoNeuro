@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { decks, cards, generateId } from '$lib/stores.js';
+	import { decks, cards, reviewLogs } from '$lib/stores.js';
+	import type { Deck } from '$lib/types.js';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -19,14 +20,14 @@
 		Share2
 	} from '@lucide/svelte';
 	import { parseImport, MAX_IMPORT_BYTES } from '$lib/import.js';
+	import { importApkgFile } from '$lib/apkg-import.js';
 	import { haptic } from '$lib/haptics.js';
 	import MarkdownRenderer from '$lib/components/markdown-renderer.svelte';
 	import * as m from '$lib/paraglide/messages.js';
 	import { buildDeckExport } from '$lib/deck-export.js';
 	import { exportToAnkiCsv, downloadAnkiCsv } from '$lib/anki-export.js';
+	import { exportApkgFile, downloadApkg } from '$lib/apkg-export.js';
 	import { buildShareUrl } from '$lib/deck-share.js';
-	import type { Deck } from '$lib/types.js';
-	import { importApkgFile } from '$lib/apkg-import.js';
 
 	const deckId = page.params.id ?? '';
 
@@ -50,12 +51,38 @@
 	let deletingId: string | null = $state(null);
 	let deleteOpen = $state(false);
 	let editorMode = $state<'edit' | 'preview'>('edit');
+	let splitView = $state(false);
+	let editorPane: HTMLDivElement | null = $state(null);
+	let previewPane: HTMLDivElement | null = $state(null);
+	let syncingScroll = false;
+
+	function onEditorScroll() {
+		if (syncingScroll || !splitView || !editorPane || !previewPane) return;
+		syncingScroll = true;
+		const ratio = editorPane.scrollTop / (editorPane.scrollHeight - editorPane.clientHeight || 1);
+		previewPane.scrollTop = ratio * (previewPane.scrollHeight - previewPane.clientHeight);
+		requestAnimationFrame(() => (syncingScroll = false));
+	}
+
+	function onPreviewScroll() {
+		if (syncingScroll || !splitView || !editorPane || !previewPane) return;
+		syncingScroll = true;
+		const ratio =
+			previewPane.scrollTop / (previewPane.scrollHeight - previewPane.clientHeight || 1);
+		editorPane.scrollTop = ratio * (editorPane.scrollHeight - editorPane.clientHeight);
+		requestAnimationFrame(() => (syncingScroll = false));
+	}
 	let sm2InitialInterval = $state(1);
 	let sm2EfModifier = $state(0);
 	let sm2MaxInterval = $state(0);
 	let shareState = $state<'idle' | 'copied' | 'manual'>('idle');
 	let shareUrl = $state('');
 	let apkgBusy = $state(false);
+	let fileName = $state('');
+	let csvHeaders = $state<string[]>([]);
+	let csvRows = $state<any[]>([]);
+	let csvMapping = $state<ColumnMapping>({ front: null, back: null, tags: null, cloze: null });
+	let csvErrors = $state<string[]>([]);
 
 	$effect(() => {
 		if (deck?.sm2Overrides) {
@@ -86,7 +113,6 @@
 	let importText = $state('');
 	let importParsed: { front: string; back: string; cloze?: string; tags?: string[] }[] = $state([]);
 	let importError = $state('');
-	let fileName = $state('');
 
 	function flashSaved() {
 		savedFlash = true;
@@ -208,6 +234,21 @@
 			}
 			return;
 		}
+		const csvName = file.name.toLowerCase();
+		if (csvName.endsWith('.csv')) {
+			fileName = file.name;
+			const csvText = await file.text();
+			const parsed = parseCsv(csvText);
+			csvHeaders = parsed.headers;
+			csvRows = parsed.rows;
+			csvErrors = parsed.errors;
+			csvMapping = autoDetectMapping(parsed.headers);
+			if (parsed.errors.length > 0) {
+				importError = `CSV parsing warnings: ${parsed.errors.join(', ')}`;
+			}
+			target.value = '';
+			return;
+		}
 		const text = await file.text();
 		runParse(text);
 		target.value = '';
@@ -239,6 +280,20 @@
 		haptic(10);
 	}
 
+	async function handleApkgExport() {
+		if (!deck) return;
+		apkgBusy = true;
+		try {
+			const blob = await exportApkgFile(deck, deckCards, $reviewLogs);
+			downloadApkg(blob, deck.name);
+			haptic(10);
+		} catch {
+			// Silent failure — user sees nothing if WASM fails to load.
+		} finally {
+			apkgBusy = false;
+		}
+	}
+
 	async function handleShare() {
 		if (!deck) return;
 		const url = buildShareUrl(window.location.origin, deck, deckCards);
@@ -251,6 +306,43 @@
 		}
 		setTimeout(() => (shareState = 'idle'), 6000);
 		haptic(10);
+	}
+	function applyCsvImport() {
+		const { cards: mappedCards, errors } = mapRowsToCards(csvRows, csvMapping);
+		if (errors.length > 0) {
+			importError = errors.join('; ');
+		}
+		if (mappedCards.length === 0) return;
+		doImportFromMapped(mappedCards);
+	}
+
+	function doImportFromMapped(
+		mappedCards: { front: string; back: string; tags?: string[]; cloze?: string }[]
+	) {
+		const now = new Date().toISOString();
+		const toAdd = mappedCards.map((c) => ({
+			id: generateId(),
+			deckId,
+			front: c.front,
+			back: c.back,
+			tags: c.tags ?? [],
+			interval: 0,
+			repetitions: 0,
+			easeFactor: 2.5,
+			dueDate: now,
+			createdAt: now
+		}));
+		cards.update((all) => [...all, ...toAdd]);
+		haptic(18);
+		importOpen = false;
+		importText = '';
+		importParsed = [];
+		fileName = '';
+		importError = '';
+		csvHeaders = [];
+		csvRows = [];
+		csvMapping = { front: null, back: null, tags: null, cloze: null };
+		csvErrors = [];
 	}
 </script>
 
@@ -283,6 +375,15 @@
 		<Button variant="ghost" size="icon" onclick={handleAnkiExport} aria-label={m['anki.export']()}>
 			<FileText class="size-[18px] [stroke-width:1.75]" />
 		</Button>
+		<Button
+			variant="ghost"
+			size="icon"
+			onclick={handleApkgExport}
+			aria-label="Export .apkg"
+			disabled={apkgBusy}
+		>
+			<FileUp class="size-[18px] [stroke-width:1.75]" />
+		</Button>
 		{#if shareState === 'copied'}
 			<span class="text-xs text-accent" role="status">{m['deck.shareCopied']()}</span>
 		{:else if shareState === 'manual'}
@@ -302,11 +403,10 @@
 			</div>
 		{/if}
 		<Dialog.Root bind:open={importOpen}>
-			<Dialog.Trigger>
-				<Button variant="outline" size="sm" class="gap-1.5">
-					<Upload class="size-[18px] [stroke-width:1.75]" />
-					{m['deck.import']()}
-				</Button>
+			<Dialog.Trigger
+				class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-input bg-card px-3 text-[13px] font-semibold tracking-[-0.01em] transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+			>
+				<span><Upload class="size-[18px] [stroke-width:1.75]" /> {m['deck.import']()}</span>
 			</Dialog.Trigger>
 			<Dialog.Content class="sm:max-w-[520px]">
 				<Dialog.Header>
@@ -417,6 +517,71 @@
 							>
 						</div>
 					{/if}
+					{#if csvHeaders.length > 0}
+						<div class="mt-3 space-y-2">
+							<p class="font-mono text-xs font-semibold text-foreground">CSV Column Mapping</p>
+							<div class="grid grid-cols-2 gap-2">
+								<div class="space-y-1">
+									<Label class="text-xs">Front</Label>
+									<select
+										bind:value={csvMapping.front}
+										class="w-full rounded border bg-card px-2 py-1 text-xs"
+									>
+										<option value="">-- Select --</option>
+										{#each csvHeaders as h, i}
+											<option value={i}>{h}</option>
+										{/each}
+									</select>
+								</div>
+								<div class="space-y-1">
+									<Label class="text-xs">Back</Label>
+									<select
+										bind:value={csvMapping.back}
+										class="w-full rounded border bg-card px-2 py-1 text-xs"
+									>
+										<option value="">-- Select --</option>
+										{#each csvHeaders as h, i}
+											<option value={i}>{h}</option>
+										{/each}
+									</select>
+								</div>
+								<div class="space-y-1">
+									<Label class="text-xs">Tags (optional)</Label>
+									<select
+										bind:value={csvMapping.tags}
+										class="w-full rounded border bg-card px-2 py-1 text-xs"
+									>
+										<option value="">-- None --</option>
+										{#each csvHeaders as h, i}
+											<option value={i}>{h}</option>
+										{/each}
+									</select>
+								</div>
+								<div class="space-y-1">
+									<Label class="text-xs">Cloze (optional)</Label>
+									<select
+										bind:value={csvMapping.cloze}
+										class="w-full rounded border bg-card px-2 py-1 text-xs"
+									>
+										<option value="">-- None --</option>
+										{#each csvHeaders as h, i}
+											<option value={i}>{h}</option>
+										{/each}
+									</select>
+								</div>
+							</div>
+							{#if csvErrors.length > 0}
+								<p
+									class="mt-2 rounded-md border border-[var(--q-errei)]/30 bg-[color-mix(in_oklch,var(--q-errei)_10%,transparent)] px-3 py-2 text-xs text-[var(--q-errei)]"
+								>
+									{csvErrors.length} errors found
+								</p>
+							{/if}
+							<Button onclick={applyCsvImport} class="mt-2 w-full" variant="secondary"
+								>Preview & Import</Button
+							>
+						</div>
+					{/if}
 				</div>
 			</Dialog.Content>
 		</Dialog.Root>
@@ -511,7 +676,7 @@
 								type="button"
 								onclick={() => (editorMode = 'edit')}
 								class="rounded px-3 py-1 text-xs font-semibold transition-colors {editorMode ===
-								'edit'
+									'edit' && !splitView
 									? 'bg-background text-foreground shadow-sm'
 									: 'text-muted-foreground hover:text-foreground'}">{m['editor.edit']()}</button
 							>
@@ -519,14 +684,75 @@
 								type="button"
 								onclick={() => (editorMode = 'preview')}
 								class="rounded px-3 py-1 text-xs font-semibold transition-colors {editorMode ===
-								'preview'
+									'preview' && !splitView
 									? 'bg-background text-foreground shadow-sm'
 									: 'text-muted-foreground hover:text-foreground'}">{m['editor.preview']()}</button
+							>
+							<button
+								type="button"
+								onclick={() => {
+									splitView = !splitView;
+									if (splitView) editorMode = 'edit';
+								}}
+								class="rounded px-3 py-1 text-xs font-semibold transition-colors {splitView
+									? 'bg-background text-foreground shadow-sm'
+									: 'text-muted-foreground hover:text-foreground'}"
+								aria-pressed={splitView}
+								aria-label="Toggle split view">Split</button
 							>
 						</div>
 						<span class="text-[10px] text-muted-foreground">{m['editor.markdownHint']()}</span>
 					</div>
-					{#if editorMode === 'edit'}
+					{#if splitView}
+						<div class="grid gap-3 md:grid-cols-2">
+							<div class="space-y-1.5">
+								<Label>{m['deck.front']()}</Label>
+								<div
+									bind:this={editorPane}
+									onscroll={onEditorScroll}
+									class="h-48 overflow-auto rounded-md border bg-card"
+								>
+									<Textarea
+										bind:value={front}
+										placeholder={m['deck.frontPlaceholder']()}
+										rows={6}
+										class="h-full resize-none border-none bg-transparent focus-visible:ring-0"
+									/>
+								</div>
+							</div>
+							<div class="space-y-1.5">
+								<Label id="front-preview-label">{m['deck.front']} Preview</Label>
+								<div
+									bind:this={previewPane}
+									onscroll={onPreviewScroll}
+									aria-labelledby="front-preview-label"
+									class="h-48 overflow-auto rounded-md border bg-card px-3 py-2"
+								>
+									<MarkdownRenderer content={front} />
+								</div>
+							</div>
+						</div>
+						<div class="grid gap-3 md:grid-cols-2">
+							<div class="space-y-1.5">
+								<Label>{m['deck.backField']()}</Label>
+								<Textarea
+									bind:value={back}
+									placeholder={m['deck.backPlaceholder']()}
+									rows={6}
+									class="h-48 resize-none overflow-auto"
+								/>
+							</div>
+							<div class="space-y-1.5">
+								<Label id="back-preview-label">{m['deck.backField']} Preview</Label>
+								<div
+									aria-labelledby="back-preview-label"
+									class="h-48 overflow-auto rounded-md border bg-card px-3 py-2"
+								>
+									<MarkdownRenderer content={back} />
+								</div>
+							</div>
+						</div>
+					{:else if editorMode === 'edit'}
 						<div class="space-y-1.5">
 							<Label>{m['deck.front']()}</Label>
 							<Textarea bind:value={front} placeholder={m['deck.frontPlaceholder']()} rows={3} />
@@ -609,9 +835,11 @@
 				</Card.Header>
 				<Card.Content class="space-y-3">
 					<div class="space-y-1.5">
-						<Label class="text-xs">{m['sm2.initialInterval']()}</Label>
+						<Label for="sm2-initial-interval" class="text-xs">{m['sm2.initialInterval']()}</Label>
 						<Input
+							id="sm2-initial-interval"
 							type="number"
+							aria-label={m['sm2.initialInterval']()}
 							min="1"
 							max="30"
 							bind:value={sm2InitialInterval}
@@ -620,9 +848,11 @@
 						/>
 					</div>
 					<div class="space-y-1.5">
-						<Label class="text-xs">{m['sm2.efModifier']()}</Label>
+						<Label for="sm2-ef-modifier" class="text-xs">{m['sm2.efModifier']()}</Label>
 						<Input
+							id="sm2-ef-modifier"
 							type="number"
+							aria-label={m['sm2.efModifier']()}
 							step="0.01"
 							min="-0.5"
 							max="0.5"
@@ -632,9 +862,11 @@
 						/>
 					</div>
 					<div class="space-y-1.5">
-						<Label class="text-xs">{m['sm2.maxInterval']()}</Label>
+						<Label for="sm2-max-interval" class="text-xs">{m['sm2.maxInterval']()}</Label>
 						<Input
+							id="sm2-max-interval"
 							type="number"
+							aria-label={m['sm2.maxInterval']()}
 							min="0"
 							max="3650"
 							bind:value={sm2MaxInterval}

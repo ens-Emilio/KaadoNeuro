@@ -3,6 +3,7 @@
  * Não depende de Svelte, DOM ou stores — recebe dados e retorna novos estados.
  */
 import type { Flashcard, ReviewLog, Deck } from './types.js';
+import { calculateFsrsReview } from './fsrs.js';
 import { calculateReview } from './sm2.js';
 
 export interface ReviewResult {
@@ -22,14 +23,27 @@ export function processReview(
 	card: Flashcard,
 	quality: number,
 	generateId: () => string,
-	overrides?: Deck['sm2Overrides']
+	overrides?: Deck['sm2Overrides'],
+	algorithm?: 'sm2' | 'fsrs'
 ): ReviewResult {
 	if (quality < 0 || quality > 5 || !Number.isInteger(quality)) {
 		throw new Error(`Invalid quality: ${quality}. Expected an integer from 0 to 5.`);
 	}
 
-	const updatedFields = calculateReview(card, quality, overrides);
-	const updatedCard: Flashcard = { ...card, ...updatedFields };
+	let updatedCard: Flashcard;
+
+	if (algorithm === 'fsrs') {
+		const fsrsResult = calculateFsrsReview(card, quality);
+		updatedCard = {
+			...card,
+			interval: fsrsResult.interval,
+			dueDate: fsrsResult.dueDate,
+			fsrsState: fsrsResult.fsrsState
+		};
+	} else {
+		const updatedFields = calculateReview(card, quality, overrides);
+		updatedCard = { ...card, ...updatedFields };
+	}
 
 	const newLog: ReviewLog = {
 		id: generateId(),
@@ -100,4 +114,97 @@ export function getAllDueCards(
 			return true;
 		})
 		.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+}
+
+/**
+ * Filters cards that are overdue (past their dueDate) regardless of normal scheduling.
+ * Used for dedicated "Overdue Review" mode.
+ */
+export function getOverdueCards(
+	cards: Flashcard[],
+	deckId: string | undefined,
+	now: Date = new Date(),
+	activeTags: string[] = []
+): Flashcard[] {
+	return cards
+		.filter((c) => {
+			if (deckId && c.deckId !== deckId) return false;
+			if (new Date(c.dueDate) >= now) return false; // Only cards strictly past due
+			if (activeTags.length > 0) {
+				const cardTags = Array.isArray(c.tags) ? c.tags : [];
+				return activeTags.some((t) => cardTags.includes(t));
+			}
+			return true;
+		})
+		.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+}
+
+/**
+ * Counts overdue cards across all decks or a specific deck.
+ * Returns the count for UI badges.
+ */
+export function countOverdueCards(
+	cards: Flashcard[],
+	deckId: string | undefined,
+	now: Date = new Date(),
+	activeTags: string[] = []
+): number {
+	return cards.filter((c) => {
+		if (deckId && c.deckId !== deckId) return false;
+		if (new Date(c.dueDate) >= now) return false;
+		if (activeTags.length > 0) {
+			const cardTags = Array.isArray(c.tags) ? c.tags : [];
+			return activeTags.some((t) => cardTags.includes(t));
+		}
+		return true;
+	}).length;
+}
+
+/**
+ * Processes a review for an overdue card without altering the SM-2 interval calculation.
+ * Treats the review as if it happened on the original due date.
+ * This preserves the card's scheduled interval instead of recalculating from today.
+ */
+export function processOverdueReview(
+	card: Flashcard,
+	quality: number,
+	generateId: () => string,
+	overrides?: Deck['sm2Overrides']
+): ReviewResult {
+	if (quality < 0 || quality > 5 || !Number.isInteger(quality)) {
+		throw new Error(`Invalid quality: ${quality}. Expected an integer from 0 to 5.`);
+	}
+
+	// Calculate what the card's parameters WOULD have been if reviewed on its dueDate
+	const dueDate = new Date(card.dueDate);
+
+	// Create a temporary card with the dueDate as "now" for SM-2 calculation
+	const tempCard: Flashcard = {
+		...card,
+		dueDate: dueDate.toISOString()
+	};
+
+	const updatedFields = calculateReview(tempCard, quality, overrides);
+
+	// The interval is calculated correctly, but we need to set the NEW dueDate
+	// relative to the ORIGINAL dueDate, not today
+	const newDueDate = new Date(dueDate);
+	newDueDate.setDate(newDueDate.getDate() + updatedFields.interval);
+
+	const updatedCard: Flashcard = {
+		...card,
+		interval: updatedFields.interval,
+		repetitions: updatedFields.repetitions,
+		easeFactor: updatedFields.easeFactor,
+		dueDate: newDueDate.toISOString()
+	};
+
+	const newLog: ReviewLog = {
+		id: generateId(),
+		cardId: card.id,
+		quality,
+		reviewedAt: new Date().toISOString()
+	};
+
+	return { updatedCard, newLog };
 }

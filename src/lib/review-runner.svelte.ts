@@ -1,16 +1,19 @@
 import { get } from 'svelte/store';
+import { browser } from '$app/environment';
 import { cards as cardStore, decks as deckStore, generateId, reviewLogs } from '$lib/stores.js';
-import { awardStreakBonus } from '$lib/gamification-store.js';
+import { awardStreakBonus, evaluateBadges } from '$lib/gamification-store.js';
 import {
 	applySessionLimit,
 	getAllDueCards,
 	getDueCards,
-	processReview
+	getOverdueCards,
+	processReview,
+	processOverdueReview
 } from '$lib/review-session.js';
-import { haptic } from '$lib/haptics.js';
+import { hapticCardFlip, hapticCorrect, hapticWrong, hapticSessionComplete } from '$lib/haptics.js';
 import type { Flashcard } from '$lib/types.js';
 
-export type ReviewScope = { kind: 'deck'; deckId: string } | { kind: 'all' };
+export type ReviewScope = { kind: 'deck'; deckId: string } | { kind: 'all' } | { kind: 'overdue' };
 
 export interface ReviewRunnerOptions {
 	scope: ReviewScope;
@@ -31,7 +34,9 @@ export function createReviewRunner({ scope, cards: readCards, limit, now }: Revi
 	const allDueCards = $derived(
 		scope.kind === 'deck'
 			? getDueCards(readCards(), scope.deckId, now(), activeTags)
-			: getAllDueCards(readCards(), now(), activeTags)
+			: scope.kind === 'overdue'
+				? getOverdueCards(readCards(), undefined, now(), activeTags)
+				: getAllDueCards(readCards(), now(), activeTags)
 	);
 	const dueCards = $derived(sessionActive ? applySessionLimit(allDueCards, limit()) : allDueCards);
 	const currentCard: Flashcard | undefined = $derived(dueCards[0]);
@@ -46,6 +51,7 @@ export function createReviewRunner({ scope, cards: readCards, limit, now }: Revi
 	const remaining = $derived(dueCards.length);
 
 	$effect(() => {
+		if (!browser) return;
 		if (allDueCards.length > 0 && totalAtStart === 0) {
 			totalAtStart = allDueCards.length;
 			sessionCount = 0;
@@ -63,7 +69,7 @@ export function createReviewRunner({ scope, cards: readCards, limit, now }: Revi
 	function flip() {
 		if (isFlipped) return;
 		isFlipped = true;
-		haptic(10);
+		hapticCardFlip();
 	}
 
 	function continueSession() {
@@ -74,10 +80,14 @@ export function createReviewRunner({ scope, cards: readCards, limit, now }: Revi
 		const card = currentCard;
 		if (!card) return;
 		const deck = get(deckStore).find((d) => d.id === card.deckId);
-		const { updatedCard, newLog } = processReview(card, quality, generateId, deck?.sm2Overrides);
+		const processFn = scope.kind === 'overdue' ? processOverdueReview : processReview;
+		const { updatedCard, newLog } = processFn(card, quality, generateId, deck?.sm2Overrides);
 		cardStore.update((all) => all.map((item) => (item.id === updatedCard.id ? updatedCard : item)));
 		reviewLogs.update((logs) => [...logs, newLog]);
 		awardStreakBonus();
+		evaluateBadges(get(cardStore), get(reviewLogs), now());
+		if (quality >= 3) hapticCorrect();
+		else hapticWrong();
 		isFlipped = false;
 	}
 
@@ -94,6 +104,12 @@ export function createReviewRunner({ scope, cards: readCards, limit, now }: Revi
 		if (event.key === '2') review(3);
 		if (event.key === '3') review(4);
 		if (event.key === '4') review(5);
+		if (event.key === 'e' || event.key === 'E') {
+			event.preventDefault();
+			window.dispatchEvent(
+				new CustomEvent('kaadoneuro:edit-card', { detail: { cardId: currentCard.id } })
+			);
+		}
 	}
 
 	return {

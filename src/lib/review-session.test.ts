@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { processReview, getDueCards, sessionProgress } from './review-session.js';
+import {
+	processReview,
+	getDueCards,
+	sessionProgress,
+	getOverdueCards,
+	countOverdueCards,
+	processOverdueReview
+} from './review-session.js';
 import type { Flashcard } from './types.js';
 
 function makeCard(overrides: Partial<Flashcard> = {}): Flashcard {
@@ -131,5 +138,88 @@ describe('sessionProgress', () => {
 	it('retorna 0 quando totalAtStart é 0 ou negativo', () => {
 		expect(sessionProgress(0, 0)).toBe(0);
 		expect(sessionProgress(-1, 0)).toBe(0);
+	});
+});
+
+describe('getOverdueCards', () => {
+	it('filters only strictly overdue cards', () => {
+		const now = new Date('2026-10-29T12:00:00Z');
+		const cards: Flashcard[] = [
+			makeCard({ id: '1', dueDate: '2026-10-28T12:00:00Z' }), // Overdue
+			makeCard({ id: '2', dueDate: '2026-10-29T12:00:00Z' }), // Due now (not overdue)
+			makeCard({ id: '3', dueDate: '2026-10-30T12:00:00Z' }) // Future
+		];
+		const result = getOverdueCards(cards, undefined, now);
+		expect(result).toHaveLength(1);
+		expect(result[0].id).toBe('1');
+	});
+
+	it('filters by deckId when provided', () => {
+		const now = new Date('2026-10-29T12:00:00Z');
+		const cards: Flashcard[] = [
+			makeCard({ id: '1', deckId: 'd1', dueDate: '2026-10-28T12:00:00Z' }),
+			makeCard({ id: '2', deckId: 'd2', dueDate: '2026-10-28T12:00:00Z' })
+		];
+		const result = getOverdueCards(cards, 'd1', now);
+		expect(result).toHaveLength(1);
+		expect(result[0].id).toBe('1');
+	});
+});
+
+describe('countOverdueCards', () => {
+	it('returns correct count of overdue cards', () => {
+		const now = new Date('2026-10-29T12:00:00Z');
+		const cards: Flashcard[] = [
+			makeCard({ id: '1', dueDate: '2026-10-28T12:00:00Z' }),
+			makeCard({ id: '2', dueDate: '2026-10-27T12:00:00Z' }),
+			makeCard({ id: '3', dueDate: '2026-10-30T12:00:00Z' })
+		];
+		expect(countOverdueCards(cards, undefined, now)).toBe(2);
+	});
+});
+
+describe('processOverdueReview', () => {
+	it('preserves interval relative to original dueDate', () => {
+		const card = makeCard({
+			id: 'c1',
+			interval: 1,
+			repetitions: 0,
+			easeFactor: 2.5,
+			dueDate: '2026-10-28T12:00:00Z'
+		});
+		const generateId = () => 'log1';
+
+		// Reviewing an overdue card with quality 5 (easy) should result in interval 6 (1 + 5)
+		// The new dueDate should be 2026-10-28 + 6 days = 2026-11-03
+		const result = processOverdueReview(card, 5, generateId);
+
+		expect(result.updatedCard.interval).toBe(1); // Initial interval for rep 0 is 1 day
+		expect(result.updatedCard.repetitions).toBe(1);
+
+		// Verify the new due date is exactly 1 day after the original due date
+		// (since interval=1 for first repetition)
+		const originalDue = new Date('2026-10-28T12:00:00Z');
+		const expectedDue = new Date(originalDue.getTime() + 1 * 24 * 60 * 60 * 1000);
+		const resultDate = new Date(result.updatedCard.dueDate);
+
+		// Allow small tolerance for timezone/rounding differences
+		const diffMs = Math.abs(resultDate.getTime() - expectedDue.getTime());
+		expect(diffMs).toBeLessThan(60 * 60 * 1000); // Less than 1 hour difference
+	});
+
+	it('resets interval on failure (quality < 3)', () => {
+		const card = makeCard({
+			id: 'c1',
+			interval: 10,
+			repetitions: 5,
+			easeFactor: 2.5,
+			dueDate: '2026-10-28T12:00:00Z'
+		});
+		const generateId = () => 'log1';
+
+		const result = processOverdueReview(card, 0, generateId);
+
+		expect(result.updatedCard.interval).toBe(1); // Reset to initial
+		expect(result.updatedCard.repetitions).toBe(0);
 	});
 });

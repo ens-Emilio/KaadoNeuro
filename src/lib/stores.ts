@@ -135,6 +135,42 @@ export const sessionLimit = persisted<number>('kaadoneuro_session_limit', 50, {
 		}
 	}
 });
+// Derived store that flattens deck hierarchy for backward-compatible queries.
+// Includes parent decks followed by their children (depth-first).
+export const flatDecks = derived(decks, ($decks) => {
+	const deckMap = new Map<string, Deck>();
+	const rootDecks: Deck[] = [];
+	const childrenMap = new Map<string, Deck[]>();
+
+	for (const deck of $decks) {
+		deckMap.set(deck.id, deck);
+		if (!deck.parentId) {
+			rootDecks.push(deck);
+		} else {
+			if (!childrenMap.has(deck.parentId)) {
+				childrenMap.set(deck.parentId, []);
+			}
+			childrenMap.get(deck.parentId)!.push(deck);
+		}
+	}
+
+	const result: Deck[] = [];
+	function addDeckAndChildren(deck: Deck) {
+		result.push(deck);
+		const children = childrenMap.get(deck.id);
+		if (children) {
+			for (const child of children) {
+				addDeckAndChildren(child);
+			}
+		}
+	}
+
+	for (const root of rootDecks) {
+		addDeckAndChildren(root);
+	}
+
+	return result;
+});
 
 // Função auxiliar para criar ID único (UUID v4 simplificado ou usar lib se preferir)
 export function generateId(): string {

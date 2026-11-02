@@ -32,7 +32,11 @@ export const SnapshotSchema = z.object({
 	decks: z.array(DeckSchema).max(2000),
 	cards: z.array(CardSchema).max(100000),
 	reviewLogs: z.array(ReviewSchema).max(500000),
-	exportedAt: z.string().datetime()
+	exportedAt: z.string().datetime(),
+	checksum: z
+		.string()
+		.regex(/^[0-9a-f]{64}$/)
+		.optional()
 });
 
 export type Snapshot = z.infer<typeof SnapshotSchema>;
